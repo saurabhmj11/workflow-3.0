@@ -49,12 +49,9 @@ function AgentNode({ data, selected, id }: NodeProps) {
   const Icon = categoryIcons[nodeType] ?? FALLBACK_ICON
   const handles = getSourceHandles(nodeType)
 
-  // Read execution status for this node from the execution store
+  // Read execution status for this node from the execution store — use the pre-computed stable map
   const nodeStatus: NodeExecutionStatus | null = useExecutionStore((state) => {
-    const activeResult = state.results.find((r) => r.runId === state.activeResultId)
-    if (!activeResult) return null
-    const step = activeResult.steps.find((s) => s.nodeId === id)
-    return step?.status ?? null
+    return state.nodeStatusMap[id] ?? null
   })
 
   // Determine glow color based on category

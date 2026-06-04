@@ -209,3 +209,38 @@ Build Verification (Sprint 2):
 - All API endpoints tested and working
 - MCP tools API returns 8 builtin tools with full schemas
 - Dev server running on port 3000
+
+# OpenWorkflow — Bug Fix: Run Button Crash
+
+---
+Task ID: 11
+Agent: Main
+Task: Fix client-side crash when clicking the Run button
+
+Work Log:
+- Investigated "Application error: a client-side exception has occurred" crash
+- Read all key files: page.tsx, engine.ts, workflow-store.ts, execution-store.ts, variable-resolver.ts, agent-node.tsx, execution-panel.tsx, and all component files
+- Identified 5 root causes of the crash:
+  1. **Unstable Zustand selectors** — `executionSteps` selector in page.tsx created a new object on every render, causing `flowEdges` useMemo to recalculate infinitely, triggering cascading re-renders that eventually crashed React
+  2. **Same issue in agent-node.tsx** — The `nodeStatus` selector used `.find()` which created new references every render
+  3. **Missing Error Boundary** — No error boundary to catch rendering errors gracefully, so any component error crashed the entire app
+  4. **Unsafe `getCategoryForType`** — Used `!` non-null assertion which would throw if called with an unexpected type
+  5. **Null config in engine** — `resolveVariables` could be called with undefined/null node config
+
+Fixes applied:
+1. **execution-store.ts** — Added pre-computed `nodeStatusMap: Record<string, NodeExecutionStatus>` field that's updated alongside results. This provides a stable reference for selectors instead of computing on every render.
+2. **page.tsx** — Replaced unstable `executionSteps` selector with `nodeStatusMap` selector. Added `isRunning` selector for button state. Added ErrorBoundary wrapper. Added double-click prevention on Run button.
+3. **agent-node.tsx** — Replaced `.find()`-based selector with simple `state.nodeStatusMap[id] ?? null` lookup.
+4. **types.ts** — Changed `getCategoryForType` from `find()!` to `find() ?? NODE_CATEGORIES[0]` for safe fallback.
+5. **engine.ts** — Added `node.config ?? {}` safety for resolveVariables calls.
+6. **execution-panel.tsx** — Wrapped `getCategoryForType` in try/catch with NODE_CATEGORIES fallback.
+7. **error-boundary.tsx** — New React error boundary component with user-friendly error UI and retry button.
+8. **global-error.tsx** — New Next.js global error handler for uncaught client errors.
+
+Stage Summary:
+- Build compiles successfully: `npx next build` — ✓ Compiled successfully
+- All unstable selectors replaced with pre-computed stable references
+- Error boundary prevents total app crash on rendering errors
+- Run button has double-click prevention and disabled state during execution
+- Safe fallbacks for all type lookups and config access
+- Production server verified: page loads 200, API endpoints working

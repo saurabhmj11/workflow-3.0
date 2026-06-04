@@ -2,7 +2,7 @@
 
 import { useExecutionStore } from '@/stores/execution-store'
 import { Badge } from '@/components/ui/badge'
-import { getCategoryForType } from '@/lib/types'
+import { getCategoryForType, NODE_CATEGORIES } from '@/lib/types'
 import { Check, X, Clock, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
@@ -101,7 +101,12 @@ export function ExecutionPanel() {
             {/* Steps */}
             <div className="space-y-1">
               {activeResult.steps.map((step, i) => {
-                const cat = getCategoryForType(step.nodeType)
+                let cat
+                try {
+                  cat = getCategoryForType(step.nodeType)
+                } catch {
+                  cat = NODE_CATEGORIES[0] // fallback to trigger category
+                }
                 return <StepCard key={step.nodeId} step={step} index={i} cat={cat} />
               })}
             </div>

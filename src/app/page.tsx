@@ -23,7 +23,7 @@ import { NodeConfigPanel } from '@/components/config/node-config-panel'
 import { useWorkflowStore, nodeToFlow } from '@/stores/workflow-store'
 import { useExecutionStore } from '@/stores/execution-store'
 import { executeWorkflow } from '@/lib/engine'
-import { getCategoryForType, type NodeType, type NodeCategory, type NodeExecutionStatus } from '@/lib/types'
+import { getCategoryForType, type NodeType, type NodeCategory } from '@/lib/types'
 import { TemplateGallery } from '@/components/workflow/template-gallery'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +46,7 @@ import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
 import { VersionHistory } from '@/components/workflow/version-history'
 import { autoLayout } from '@/lib/auto-layout'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 let nodeIdCounter = 0
 
@@ -74,23 +75,15 @@ export default function WorkflowBuilder() {
   const setWorkflowId = useWorkflowStore((s) => s.setWorkflowId)
   const setName = useWorkflowStore((s) => s.setName)
 
-  // Read execution state for edge coloring
-  const executionSteps = useExecutionStore((state) => {
-    const activeResult = state.results.find((r) => r.runId === state.activeResultId)
-    if (!activeResult) return null
-    // Return a simple map of nodeId → status for fast lookup
-    const map: Record<string, NodeExecutionStatus> = {}
-    for (const step of activeResult.steps) {
-      map[step.nodeId] = step.status
-    }
-    return map
-  })
+  // Read execution state for edge coloring — use the pre-computed stable map from the store
+  const nodeStatusMap = useExecutionStore((s) => s.nodeStatusMap)
+  const isRunning = useExecutionStore((s) => s.isRunning)
 
   const flowNodes = useMemo(() => storeNodes.map(nodeToFlow), [storeNodes])
   const flowEdges = useMemo(
     () =>
       storeEdges.map((e) => {
-        const sourceStatus = executionSteps?.[e.source]
+        const sourceStatus = nodeStatusMap[e.source]
         let stroke = '#64748b' // default gray
         let strokeWidth = 2
         let animated = true
@@ -124,7 +117,7 @@ export default function WorkflowBuilder() {
           data: { label: handleLabel },
         }
       }),
-    [storeEdges, executionSteps]
+    [storeEdges, nodeStatusMap]
   )
 
   const [, , onNodesChange] = useNodesState(flowNodes)
@@ -193,6 +186,11 @@ export default function WorkflowBuilder() {
 
   const handleRun = useCallback(() => {
     if (storeNodes.length === 0) return
+    // Prevent double-execution
+    if (isRunning) {
+      toast({ title: 'Already running', description: 'A workflow execution is already in progress' })
+      return
+    }
     try {
       executeWorkflow('wf-demo', storeNodes, storeEdges).catch((err) => {
         console.error('[OpenWorkflow] Execution failed:', err)
@@ -202,7 +200,7 @@ export default function WorkflowBuilder() {
       console.error('[OpenWorkflow] Failed to start execution:', err)
       toast({ title: 'Execution error', description: 'Failed to start workflow execution', variant: 'destructive' })
     }
-  }, [storeNodes, storeEdges])
+  }, [storeNodes, storeEdges, isRunning])
 
   const handleAutoLayout = useCallback(() => {
     if (storeNodes.length === 0) return
@@ -348,6 +346,7 @@ export default function WorkflowBuilder() {
   const hasTrigger = storeNodes.some((n) => getCategoryForType(n.type).category === 'trigger')
 
   return (
+    <ErrorBoundary>
     <div className="h-screen flex flex-col bg-zinc-950">
       {/* Toolbar */}
       <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between shrink-0">
@@ -407,9 +406,9 @@ export default function WorkflowBuilder() {
           <div className="w-px h-5 bg-zinc-700 mx-1" />
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+            className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
             onClick={handleRun}
-            disabled={nodeCount === 0}
+            disabled={nodeCount === 0 || isRunning}
           >
             <Play className="h-3.5 w-3.5" />
             Run
@@ -525,5 +524,6 @@ export default function WorkflowBuilder() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   )
 }

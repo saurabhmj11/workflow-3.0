@@ -37,7 +37,7 @@ export const NODE_CATEGORIES: NodeCategoryDef[] = [
 ]
 
 export function getCategoryForType(type: NodeType): NodeCategoryDef {
-  return NODE_CATEGORIES.find(c => c.types.includes(type))!
+  return NODE_CATEGORIES.find(c => c.types.includes(type)) ?? NODE_CATEGORIES[0]
 }
 
 // ─── Node Definition ─────────────────────────────

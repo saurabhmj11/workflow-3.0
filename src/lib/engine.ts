@@ -300,9 +300,9 @@ export async function executeWorkflow(
         nodeOutputs,
         input,
         variables: context.variables,
-        config: node.config,
+        config: node.config ?? {},
       }
-      const resolvedConfig = resolveVariables(node.config, resolutionContext) as Record<string, unknown>
+      const resolvedConfig = resolveVariables(node.config ?? {}, resolutionContext) as Record<string, unknown>
 
       const result = await runNode({ ...node, config: resolvedConfig }, context, input, nodeOutputs)
 

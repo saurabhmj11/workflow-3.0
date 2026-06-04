@@ -2,13 +2,15 @@
 
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { getCategoryForType, getSourceHandles, type NodeType } from '@/lib/types'
+import { getCategoryForType, getSourceHandles, type NodeType, type NodeExecutionStatus } from '@/lib/types'
+import { useExecutionStore } from '@/stores/execution-store'
 import {
   Zap, Webhook, Clock, Mail, Phone, MessageSquare,
   GitBranch, GitMerge, Repeat, RotateCcw, Timer,
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
+  Loader2, Check, X,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -39,7 +41,7 @@ const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {
 
 const FALLBACK_ICON = Zap
 
-function AgentNode({ data, selected }: NodeProps) {
+function AgentNode({ data, selected, id }: NodeProps) {
   const nodeType = data.nodeType as NodeType
   const label = data.label as string
   const cat = getCategoryForType(nodeType)
@@ -47,12 +49,88 @@ function AgentNode({ data, selected }: NodeProps) {
   const Icon = categoryIcons[nodeType] ?? FALLBACK_ICON
   const handles = getSourceHandles(nodeType)
 
+  // Read execution status for this node from the execution store
+  const nodeStatus: NodeExecutionStatus | null = useExecutionStore((state) => {
+    const activeResult = state.results.find((r) => r.runId === state.activeResultId)
+    if (!activeResult) return null
+    const step = activeResult.steps.find((s) => s.nodeId === id)
+    return step?.status ?? null
+  })
+
+  // Determine glow color based on category
+  const glowColor = cat.category === 'trigger' ? 'rgba(59,130,246,0.4)' :
+    cat.category === 'logic' ? 'rgba(16,185,129,0.4)' :
+    cat.category === 'ai' ? 'rgba(139,92,246,0.4)' :
+    cat.category === 'human' ? 'rgba(245,158,11,0.4)' : 'rgba(6,182,212,0.4)'
+
+  // Execution state class names
+  const executionClasses = (() => {
+    switch (nodeStatus) {
+      case 'running':
+        return 'animate-pulse-glow ring-2 ring-blue-400/50'
+      case 'success':
+        return 'ring-2 ring-emerald-400/30'
+      case 'error':
+        return 'ring-2 ring-red-400/30 animate-node-shake'
+      case 'pending':
+      case 'skipped':
+        return 'opacity-60'
+      default:
+        return ''
+    }
+  })()
+
+  // Execution state inline styles
+  const executionStyle = (() => {
+    if (nodeStatus === 'running') {
+      return { boxShadow: `0 0 12px 2px rgba(59,130,246,0.5)` }
+    }
+    if (nodeStatus === 'success') {
+      return { boxShadow: `0 0 8px 1px rgba(16,185,129,0.3)` }
+    }
+    if (nodeStatus === 'error') {
+      return { boxShadow: `0 0 8px 1px rgba(239,68,68,0.3)` }
+    }
+    return undefined
+  })()
+
+  // Status badge for execution state
+  const statusBadge = (() => {
+    switch (nodeStatus) {
+      case 'running':
+        return <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+      case 'success':
+        return <Check className="h-3 w-3 text-emerald-500" />
+      case 'error':
+        return <X className="h-3 w-3 text-red-500" />
+      default:
+        return null
+    }
+  })()
+
   return (
     <div
-      className={`rounded-lg border-2 bg-zinc-900 shadow-lg min-w-[160px] transition-shadow ${
-        selected ? `${cat.borderColor} shadow-xl ring-1 ring-white/10` : `${cat.borderColor}`
-      }`}
+      className={`relative rounded-lg border-2 bg-zinc-900 shadow-lg min-w-[160px] transition-all duration-200 ${
+        selected
+          ? `${cat.borderColor} shadow-2xl ring-2 ring-white/20`
+          : `${cat.borderColor}`
+      } ${executionClasses}`}
+      style={selected ? { boxShadow: `0 0 20px ${glowColor}, 0 0 40px ${glowColor}` } : executionStyle}
     >
+      {/* Execution status badge */}
+      {statusBadge && (
+        <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 border border-zinc-600 shadow-sm">
+          {statusBadge}
+        </div>
+      )}
+
+      {/* Running spinner overlay on icon */}
+      {nodeStatus === 'running' && (
+        <div className="absolute top-2 left-2 z-10">
+          <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+        </div>
+      )}
+
       {/* Header */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-t-md ${cat.bgColor} border-b ${cat.borderColor}`}>
         <Icon className={`h-3.5 w-3.5 ${cat.color}`} />

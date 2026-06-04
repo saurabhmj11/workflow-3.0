@@ -71,6 +71,7 @@ interface WorkflowState {
   edges: EdgeDefinition[]
   name: string
   selectedNodeId: string | null
+  workflowId: string | null
 
   // History for undo/redo
   history: { nodes: NodeDefinition[]; edges: EdgeDefinition[] }[]
@@ -87,6 +88,7 @@ interface WorkflowState {
   removeEdge: (id: string) => void
   setNodes: (nodes: NodeDefinition[]) => void
   setEdges: (edges: EdgeDefinition[]) => void
+  setWorkflowId: (id: string | null) => void
   undo: () => void
   redo: () => void
   pushHistory: () => void
@@ -98,6 +100,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   edges: [],
   name: 'Untitled Workflow',
   selectedNodeId: null,
+  workflowId: null,
   history: [{ nodes: [], edges: [] }],
   historyIndex: 0,
 
@@ -159,6 +162,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
+  setWorkflowId: (id) => set({ workflowId: id }),
 
   pushHistory: () => {
     const state = get()
@@ -185,5 +189,5 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }
   },
 
-  reset: () => set({ nodes: [], edges: [], name: 'Untitled Workflow', selectedNodeId: null, history: [{ nodes: [], edges: [] }], historyIndex: 0 }),
+  reset: () => set({ nodes: [], edges: [], name: 'Untitled Workflow', selectedNodeId: null, workflowId: null, history: [{ nodes: [], edges: [] }], historyIndex: 0 }),
 }))

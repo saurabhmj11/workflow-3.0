@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ─── OpenWorkflow Prisma Schema ────────────────────
+// AI Workflow Operating System persistence layer
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +10,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String   @default("Untitled Workflow")
+  description String?
+  version     Int      @default(1)
+  isActive    Boolean  @default(false)
+  metadata    String?  // JSON string
+  nodes       XmlNode[]
+  edges       Edge[]
+  executions  Execution[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model XmlNode {
+  id         String   @id @default(cuid())
+  workflowId String
+  nodeId     String   // The logical node ID (e.g., "node-1-1234")
+  type       String   // NodeType: api, webhook, llm, condition, etc.
+  label      String
+  category   String   // NodeCategory: trigger, logic, ai, human, action
+  config     String   @default("{}") // JSON string of config
+  positionX  Float    @default(0)
+  positionY  Float    @default(0)
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, nodeId])
+}
+
+model Edge {
+  id           String   @id @default(cuid())
+  workflowId   String
+  source       String   // source nodeId
+  target       String   // target nodeId
+  sourceHandle String   @default("default")
+  targetHandle String   @default("input")
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model Execution {
+  id              String     @id @default(cuid())
+  workflowId      String
+  runId           String     @unique
+  status          String     @default("running") // running, success, error, paused, awaiting_approval
+  triggeredBy     String     @default("api")
+  input           String?    // JSON
+  output          String?    // JSON
+  steps           String     @default("[]") // JSON array of NodeExecutionStep
+  totalDurationMs Int        @default(0)
+  totalCostUsd    Float      @default(0)
+  error           String?
+  workflow        Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  startedAt       DateTime   @default(now())
+  finishedAt      DateTime?
 }

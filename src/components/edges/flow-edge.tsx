@@ -9,6 +9,9 @@ export function FlowEdge({
   sourcePosition,
   targetPosition,
   data,
+  style,
+  markerEnd,
+  selected,
 }: EdgeProps) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -23,7 +26,7 @@ export function FlowEdge({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} />
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
       {label && (
         <EdgeLabelRenderer>
           <div
@@ -31,7 +34,9 @@ export function FlowEdge({
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
-            className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-400 pointer-events-auto"
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded border pointer-events-auto ${
+              selected ? 'bg-zinc-800 border-zinc-500 text-zinc-200' : 'bg-zinc-900 border-zinc-700 text-zinc-400'
+            }`}
           >
             {label}
           </div>

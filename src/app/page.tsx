@@ -193,7 +193,15 @@ export default function WorkflowBuilder() {
 
   const handleRun = useCallback(() => {
     if (storeNodes.length === 0) return
-    executeWorkflow('wf-demo', storeNodes, storeEdges)
+    try {
+      executeWorkflow('wf-demo', storeNodes, storeEdges).catch((err) => {
+        console.error('[OpenWorkflow] Execution failed:', err)
+        toast({ title: 'Execution error', description: err instanceof Error ? err.message : 'Workflow execution failed', variant: 'destructive' })
+      })
+    } catch (err) {
+      console.error('[OpenWorkflow] Failed to start execution:', err)
+      toast({ title: 'Execution error', description: 'Failed to start workflow execution', variant: 'destructive' })
+    }
   }, [storeNodes, storeEdges])
 
   const handleAutoLayout = useCallback(() => {

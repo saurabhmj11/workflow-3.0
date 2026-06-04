@@ -32,8 +32,9 @@ async function runNode(
   input: unknown,
   _nodeOutputs: NodeOutputStore
 ): Promise<{ output: unknown; tokenUsage?: { prompt: number; completion: number }; costUsd?: number }> {
-  const cat = getCategoryForType(node.type)
-  const config = node.config
+  try {
+    const cat = getCategoryForType(node.type)
+    const config = node.config ?? {}
 
   switch (cat.category) {
     case 'trigger':
@@ -61,27 +62,36 @@ async function runNode(
         return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression } }
       }
       if (node.type === 'switch') {
-        const expression = config.expression as string | undefined
-        const cases = config.cases as Record<string, string> | undefined
         let matchedCase = 'default'
+        const rawCases = config.cases
 
-        if (expression && cases) {
-          try {
-            // Evaluate each case condition
-            for (const [caseName, caseExpr] of Object.entries(cases)) {
-              if (evaluateSimpleCondition(caseExpr, config)) {
+        try {
+          // Cases can be: array of objects [{label, expression}], record {name: expr}, or comma-separated string
+          if (Array.isArray(rawCases) && rawCases.length > 0) {
+            for (const c of rawCases) {
+              if (c && typeof c === 'object') {
+                const caseExpr = (c as Record<string, unknown>).expression
+                const caseLabel = (c as Record<string, unknown>).label
+                if (typeof caseExpr === 'string' && evaluateSimpleCondition(caseExpr, config)) {
+                  matchedCase = typeof caseLabel === 'string' ? caseLabel : String(caseExpr)
+                  break
+                }
+              }
+            }
+          } else if (rawCases && typeof rawCases === 'object' && !Array.isArray(rawCases)) {
+            for (const [caseName, caseExpr] of Object.entries(rawCases as Record<string, unknown>)) {
+              if (typeof caseExpr === 'string' && evaluateSimpleCondition(caseExpr, config)) {
                 matchedCase = caseName
                 break
               }
             }
-          } catch {
-            matchedCase = 'default'
+          } else {
+            // Fallback: deterministic based on input hash
+            const inputHash = simpleHash(JSON.stringify(input))
+            matchedCase = inputHash % 2 === 0 ? 'case1' : 'case2'
           }
-        } else {
-          // Fallback: deterministic based on input hash
-          const inputHash = simpleHash(JSON.stringify(input))
-          const caseNames = cases ? Object.keys(cases) : ['default']
-          matchedCase = caseNames[inputHash % caseNames.length] ?? 'default'
+        } catch {
+          matchedCase = 'default'
         }
         return { output: { matchedCase, input } }
       }
@@ -150,10 +160,21 @@ async function runNode(
 
       // Classifier: deterministic classification using input hash
       if (node.type === 'classifier') {
-        const categories = (config.categories as string[]) ?? ['positive', 'negative', 'neutral']
+        const rawCategories = config.categories
+        // Handle both comma-separated strings and arrays
+        let categories: string[]
+        if (Array.isArray(rawCategories)) {
+          categories = rawCategories.map(String)
+        } else if (typeof rawCategories === 'string' && rawCategories.length > 0) {
+          categories = rawCategories.split(',').map((s: string) => s.trim()).filter(Boolean)
+        } else {
+          categories = ['positive', 'negative', 'neutral']
+        }
+        if (categories.length === 0) categories = ['positive', 'negative', 'neutral']
+
         const inputStr = JSON.stringify(input)
         const hash = simpleHash(inputStr)
-        const category = categories[hash % categories.length] ?? categories[0]!
+        const category = categories[hash % categories.length] ?? categories[0] ?? 'unknown'
         const confidence = 70 + (hash % 30) // 70-99%
         return {
           output: {
@@ -189,6 +210,11 @@ async function runNode(
     default:
       return { output: input }
   }
+  } catch (err) {
+    // If any node execution fails internally, return a safe output
+    console.error(`[OpenWorkflow] Node runner error (${node.type}):`, err)
+    return { output: { error: err instanceof Error ? err.message : 'Node execution failed', input } }
+  }
 }
 
 // ─── Topological Executor ─────────────────────────
@@ -202,8 +228,16 @@ export async function executeWorkflow(
   const executionStore = useExecutionStore.getState()
   const approvalStore = useApprovalStore.getState()
 
-  const runId = executionStore.startRun(workflowId)
+  let runId: string
+  try {
+    runId = executionStore.startRun(workflowId)
+  } catch (err) {
+    console.error('[OpenWorkflow] Failed to start run:', err)
+    return
+  }
 
+  // Wrap entire execution in try/catch to prevent unhandled crashes
+  try {
   // Track outputs from each executed node for variable resolution
   const nodeOutputs: NodeOutputStore = {}
 
@@ -218,7 +252,13 @@ export async function executeWorkflow(
   }
 
   // Find trigger nodes (entry points)
-  const triggerNodes = nodes.filter((n) => getCategoryForType(n.type).category === 'trigger')
+  const triggerNodes = nodes.filter((n) => {
+    try {
+      return getCategoryForType(n.type).category === 'trigger'
+    } catch {
+      return false
+    }
+  })
   if (triggerNodes.length === 0) {
     executionStore.completeRun(runId, { status: 'error', output: { error: 'No trigger node found' }, totalDurationMs: 0 })
     return
@@ -356,4 +396,18 @@ export async function executeWorkflow(
     totalDurationMs: totalDuration,
     totalCostUsd: Math.round(totalCost * 10000) / 10000,
   })
+
+  } catch (err) {
+    // Top-level catch for any unhandled error during execution
+    console.error('[OpenWorkflow] Unhandled execution error:', err)
+    try {
+      executionStore.completeRun(runId, {
+        status: 'error',
+        output: { error: err instanceof Error ? err.message : 'Unknown execution error' },
+        totalDurationMs: 0,
+      })
+    } catch {
+      // Last resort — store might be in a bad state
+    }
+  }
 }

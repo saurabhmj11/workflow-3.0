@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { getCategoryForType, type NodeType } from '@/lib/types'
 import { Input } from '@/components/ui/input'
@@ -26,9 +26,10 @@ import {
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
-  Plus,
+  Plus, Wrench,
   type LucideIcon,
 } from 'lucide-react'
+import { ToolBrowser } from '@/components/mcp/tool-browser'
 
 // ─── Icon map (mirrors agent-node.tsx) ──────────
 const TRIGGER_ICONS: Record<string, LucideIcon> = {
@@ -51,7 +52,7 @@ const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {
 }
 
 // ─── Config Schema ──────────────────────────────
-type FieldType = 'text' | 'select' | 'textarea' | 'number' | 'switch' | 'array-string' | 'array-object'
+type FieldType = 'text' | 'select' | 'textarea' | 'number' | 'switch' | 'array-string' | 'array-object' | 'tools-tag'
 
 interface ConfigFieldDef {
   key: string
@@ -143,7 +144,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
       { value: 'gpt-4o', label: 'GPT-4o' }, { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
       { value: 'claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' }, { value: 'llama-3.1-70b', label: 'Llama 3.1 70B' },
     ] },
-    { key: 'tools', label: 'Tools', type: 'text', placeholder: 'search,calculator,api' },
+    { key: 'tools', label: 'Tools', type: 'tools-tag', placeholder: 'Add a tool...' },
     { key: 'maxIterations', label: 'Max Iterations', type: 'number', placeholder: '10' },
   ],
   rag: [
@@ -231,10 +232,12 @@ function ConfigField({
   field,
   value,
   onChange,
+  onBrowseTools,
 }: {
   field: ConfigFieldDef
   value: unknown
   onChange: (key: string, value: unknown) => void
+  onBrowseTools?: () => void
 }) {
   const strVal = value != null ? String(value) : ''
 
@@ -432,6 +435,70 @@ function ConfigField({
       )
     }
 
+    case 'tools-tag': {
+      // Parse tools from comma-separated string or array
+      const rawTools = value as string | string[] | undefined
+      const toolsList: string[] = rawTools
+        ? Array.isArray(rawTools)
+          ? rawTools
+          : String(rawTools).split(',').map((s) => s.trim()).filter(Boolean)
+        : []
+
+      return (
+        <div className="space-y-1.5">
+          {toolsList.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {toolsList.map((tool, i) => (
+                <Badge
+                  key={i}
+                  variant="outline"
+                  className="h-5 text-[10px] px-1.5 gap-1 border-violet-500/30 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 cursor-default"
+                >
+                  <Wrench className="h-2.5 w-2.5" />
+                  {tool}
+                  <button
+                    type="button"
+                    className="ml-0.5 hover:text-red-400 transition-colors"
+                    onClick={() => {
+                      const next = toolsList.filter((_, idx) => idx !== i)
+                      onChange(field.key, next.join(','))
+                    }}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <Input
+              placeholder={field.placeholder}
+              className="h-6 text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 flex-1 focus-visible:ring-zinc-600"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault()
+                  const val = (e.target as HTMLInputElement).value.trim()
+                  if (val && !toolsList.includes(val)) {
+                    onChange(field.key, [...toolsList, val].join(','))
+                    ;(e.target as HTMLInputElement).value = ''
+                  }
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px] px-2 border-violet-500/30 text-violet-400 hover:text-violet-200 hover:bg-violet-500/10 shrink-0"
+              onClick={onBrowseTools}
+            >
+              <Wrench className="h-3 w-3 mr-1" />
+              Browse
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
     default:
       return null
   }
@@ -446,6 +513,7 @@ export function NodeConfigPanel() {
   const updateNodeLabel = useWorkflowStore((s) => s.updateNodeLabel)
   const selectNode = useWorkflowStore((s) => s.selectNode)
   const removeNode = useWorkflowStore((s) => s.removeNode)
+  const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
 
   const node = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId),
@@ -493,6 +561,35 @@ export function NodeConfigPanel() {
     removeNode(selectedNodeId)
     selectNode(null)
   }, [selectedNodeId, removeNode, selectNode])
+
+  const handleAddTool = useCallback(
+    (toolName: string) => {
+      if (!selectedNodeId) return
+      const node = nodes.find((n) => n.id === selectedNodeId)
+      if (!node) return
+      const rawTools = node.config.tools as string | string[] | undefined
+      const toolsList: string[] = rawTools
+        ? Array.isArray(rawTools)
+          ? rawTools
+          : String(rawTools).split(',').map((s) => s.trim()).filter(Boolean)
+        : []
+      if (!toolsList.includes(toolName)) {
+        updateNodeConfig(selectedNodeId, { tools: [...toolsList, toolName].join(',') })
+      }
+    },
+    [selectedNodeId, nodes, updateNodeConfig]
+  )
+
+  const getSelectedTools = useCallback((): string[] => {
+    const node = nodes.find((n) => n.id === selectedNodeId)
+    if (!node) return []
+    const rawTools = node.config.tools as string | string[] | undefined
+    return rawTools
+      ? Array.isArray(rawTools)
+        ? rawTools
+        : String(rawTools).split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+  }, [nodes, selectedNodeId])
 
   if (!node || !cat) return null
 
@@ -550,6 +647,7 @@ export function NodeConfigPanel() {
                   field={field}
                   value={node.config[field.key]}
                   onChange={handleConfigChange}
+                  onBrowseTools={field.type === 'tools-tag' ? () => setToolBrowserOpen(true) : undefined}
                 />
               </div>
               {i < schema.length - 1 && <Separator className="mt-3 bg-zinc-800/50" />}
@@ -557,6 +655,14 @@ export function NodeConfigPanel() {
           ))}
         </div>
       </ScrollArea>
+
+      {/* Tool Browser Dialog */}
+      <ToolBrowser
+        open={toolBrowserOpen}
+        onOpenChange={setToolBrowserOpen}
+        onAddTool={handleAddTool}
+        selectedTools={getSelectedTools()}
+      />
 
       {/* Footer */}
       <div className="p-3 border-t border-zinc-800 shrink-0">

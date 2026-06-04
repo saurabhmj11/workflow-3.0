@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { nodeTypes } from '@/components/workflow/agent-node'
+import { FlowEdge } from '@/components/edges/flow-edge'
 import { NodePalette } from '@/components/palette/node-palette'
 import { ApprovalQueue } from '@/components/approval/approval-queue'
 import { ExecutionPanel } from '@/components/execution/execution-panel'
@@ -36,15 +37,26 @@ import {
   Workflow,
   Lightbulb,
   Save,
+  LayoutGrid,
+  GitCommitHorizontal,
+  Plug,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
+import { VersionHistory } from '@/components/workflow/version-history'
+import { autoLayout } from '@/lib/auto-layout'
+import { ToolBrowser } from '@/components/mcp/tool-browser'
 
 let nodeIdCounter = 0
+
+const edgeTypes = { flow: FlowEdge }
 
 export default function WorkflowBuilder() {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
+  const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null)
 
   const storeNodes = useWorkflowStore((s) => s.nodes)
   const storeEdges = useWorkflowStore((s) => s.edges)
@@ -97,15 +109,19 @@ export default function WorkflowBuilder() {
           animated = false
         }
 
+        // Build a label from the sourceHandle (e.g. "true", "false", "approved")
+        const handleLabel = e.sourceHandle && e.sourceHandle !== 'default' ? e.sourceHandle : undefined
+
         return {
           id: e.id,
           source: e.source,
           target: e.target,
           sourceHandle: e.sourceHandle,
           targetHandle: e.targetHandle,
-          type: 'smoothstep' as const,
+          type: 'flow' as const,
           animated,
           style: { stroke, strokeWidth },
+          data: { label: handleLabel },
         }
       }),
     [storeEdges, executionSteps]
@@ -180,6 +196,16 @@ export default function WorkflowBuilder() {
     executeWorkflow('wf-demo', storeNodes, storeEdges)
   }, [storeNodes, storeEdges])
 
+  const handleAutoLayout = useCallback(() => {
+    if (storeNodes.length === 0) return
+    const layoutedNodes = autoLayout(storeNodes, storeEdges)
+    for (const node of layoutedNodes) {
+      updateNodePosition(node.id, node.position)
+    }
+    // Fit view after layout with a short delay to allow React to re-render
+    setTimeout(() => reactFlowInstance.current?.fitView({ padding: 0.2, duration: 300 }), 50)
+  }, [storeNodes, storeEdges, updateNodePosition])
+
   const handleExport = useCallback(() => {
     const data = JSON.stringify({ name: workflowName, nodes: storeNodes, edges: storeEdges }, null, 2)
     const blob = new Blob([data], { type: 'application/json' })
@@ -250,16 +276,19 @@ export default function WorkflowBuilder() {
   // ─── Save workflow ────────────────────────────────
   const handleSave = useCallback(async () => {
     try {
-      if (workflowId) {
-        const res = await fetch(`/api/workflows/${workflowId}`, {
+      let wfId = workflowId
+
+      if (wfId) {
+        // Update existing workflow
+        const res = await fetch(`/api/workflows/${wfId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: workflowName, nodes: storeNodes, edges: storeEdges }),
         })
         const json = await res.json()
         if (!json.ok) throw new Error(json.error)
-        toast({ title: 'Workflow saved', description: 'Changes saved successfully' })
       } else {
+        // Create new workflow
         const res = await fetch('/api/workflows', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -267,13 +296,44 @@ export default function WorkflowBuilder() {
         })
         const json = await res.json()
         if (!json.ok) throw new Error(json.error)
-        setWorkflowId(json.data.id)
-        toast({ title: 'Workflow saved', description: 'Created new saved workflow' })
+        wfId = json.data.id
+        setWorkflowId(wfId)
       }
+
+      // Create a version snapshot
+      const verRes = await fetch(`/api/workflows/${wfId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          changeNote: 'Manual save',
+          nodes: storeNodes,
+          edges: storeEdges,
+        }),
+      })
+      const verJson = await verRes.json()
+      if (verJson.ok) {
+        setCurrentVersion(verJson.data.version)
+      }
+
+      toast({ title: 'Workflow saved', description: wfId === workflowId ? 'Changes saved with new version' : 'Created new saved workflow' })
     } catch (err) {
       toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' })
     }
   }, [workflowId, workflowName, storeNodes, storeEdges, setWorkflowId])
+
+  const handleVersionRestored = useCallback(() => {
+    // Refresh current version after restore
+    if (workflowId) {
+      fetch(`/api/workflows/${workflowId}/versions`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.ok && json.data.length > 0) {
+            setCurrentVersion(json.data[0].version)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [workflowId])
 
   const nodeCount = storeNodes.length
   const edgeCount = storeEdges.length
@@ -304,6 +364,13 @@ export default function WorkflowBuilder() {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={() => setTemplateOpen(true)} title="Templates">
             <Lightbulb className="h-3.5 w-3.5" />
           </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={() => setToolBrowserOpen(true)} title="MCP Tools">
+            <Plug className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={handleAutoLayout} title="Auto Layout" disabled={storeNodes.length === 0}>
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </Button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={handleImport} title="Import">
             <Upload className="h-3.5 w-3.5" />
           </Button>
@@ -313,6 +380,16 @@ export default function WorkflowBuilder() {
           <div className="w-px h-5 bg-zinc-700 mx-1" />
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={handleSave} title="Save">
             <Save className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
+            onClick={() => setVersionHistoryOpen(true)}
+            title="Version History"
+            disabled={!workflowId}
+          >
+            <GitCommitHorizontal className="h-3.5 w-3.5" />
           </Button>
           <LoadWorkflowDialog />
           <div className="w-px h-5 bg-zinc-700 mx-1" />
@@ -382,6 +459,7 @@ export default function WorkflowBuilder() {
             onNodeClick={(_event, node) => selectNode(node.id)}
             onPaneClick={() => selectNode(null)}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             snapToGrid
             snapGrid={[16, 16]}
@@ -406,6 +484,20 @@ export default function WorkflowBuilder() {
 
           {/* Template Gallery Dialog */}
           <TemplateGallery open={templateOpen} onOpenChange={setTemplateOpen} />
+
+          {/* MCP Tool Browser Dialog */}
+          <ToolBrowser
+            open={toolBrowserOpen}
+            onOpenChange={setToolBrowserOpen}
+          />
+
+          {/* Version History Panel */}
+          <VersionHistory
+            open={versionHistoryOpen}
+            onOpenChange={setVersionHistoryOpen}
+            currentVersion={currentVersion}
+            onVersionRestored={handleVersionRestored}
+          />
         </div>
 
         {/* Right panels */}

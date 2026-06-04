@@ -83,6 +83,8 @@ export interface ExecutionContext {
   depth: number
   maxDepth: number
   triggeredBy?: TriggeredBy
+  /** Outputs from previously executed nodes, keyed by nodeId. Available for debugging. */
+  nodeOutputs?: Record<string, unknown>
 }
 
 export type NodeExecutionStatus = 'success' | 'error' | 'skipped' | 'pending' | 'running'
@@ -129,6 +131,26 @@ export interface ApprovalRequest {
   createdAt: string
   slaDeadline?: string
   notes?: string
+}
+
+// ─── MCP (Model Context Protocol) ──────────────────
+export interface MCPToolDefinition {
+  id: string
+  name: string
+  description?: string
+  serverName: string
+  inputSchema?: Record<string, unknown>
+  annotations?: Record<string, unknown>
+}
+
+export interface MCPServerDefinition {
+  id: string
+  name: string
+  url: string
+  type: 'sse' | 'streamable-http' | 'stdio'
+  description?: string
+  status: 'connected' | 'disconnected' | 'error'
+  toolCount: number
 }
 
 // ─── Handle config per node type ──────────────────

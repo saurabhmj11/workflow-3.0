@@ -1,13 +1,16 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { NODE_CATEGORIES, type NodeType, type NodeCategory } from '@/lib/types'
 import { useWorkflowStore } from '@/stores/workflow-store'
+import { Input } from '@/components/ui/input'
 import {
   Zap, Webhook, Clock, Mail, Phone, MessageSquare,
   GitBranch, GitMerge, Repeat, RotateCcw, Timer,
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
+  Search, X,
 } from 'lucide-react'
 
 function getNodeIcon(type: string, category: NodeCategory): typeof Zap {
@@ -35,6 +38,16 @@ let nodeCounter = 0
 
 export function NodePalette() {
   const addNode = useWorkflowStore((s) => s.addNode)
+  const [search, setSearch] = useState('')
+
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return NODE_CATEGORIES
+    const q = search.toLowerCase().trim()
+    return NODE_CATEGORIES.map((cat) => ({
+      ...cat,
+      types: cat.types.filter((type) => type.toLowerCase().includes(q)),
+    })).filter((cat) => cat.types.length > 0)
+  }, [search])
 
   const handleDragStart = (e: React.DragEvent, type: NodeType, category: typeof NODE_CATEGORIES[number]) => {
     e.dataTransfer.setData('application/openworkflow', JSON.stringify({ type, category: category.category }))
@@ -58,13 +71,40 @@ export function NodePalette() {
   }
 
   return (
-    <div className="w-56 border-r border-zinc-800 bg-zinc-900/80 overflow-y-auto">
+    <div className="w-56 border-r border-zinc-800 bg-zinc-900/80 overflow-y-auto flex flex-col">
       <div className="p-3 border-b border-zinc-800">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Node Palette</h3>
         <p className="text-[10px] text-zinc-600 mt-0.5">Click or drag to add</p>
       </div>
-      <div className="p-2 space-y-3">
-        {NODE_CATEGORIES.map((cat) => (
+      {/* Search input */}
+      <div className="p-2 border-b border-zinc-800">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+          <Input
+            type="text"
+            placeholder="Search nodes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-7 pl-7 pr-7 text-xs bg-zinc-800 border-zinc-700 text-zinc-300 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="p-2 space-y-3 flex-1 overflow-y-auto">
+        {filteredCategories.length === 0 && (
+          <div className="py-6 text-center">
+            <p className="text-xs text-zinc-500">No results</p>
+            <p className="text-[10px] text-zinc-600 mt-1">Try a different search term</p>
+          </div>
+        )}
+        {filteredCategories.map((cat) => (
           <div key={cat.category}>
             <div className="flex items-center gap-1.5 px-1 py-1">
               <span className={`text-[10px] font-semibold uppercase tracking-wider ${cat.color}`}>

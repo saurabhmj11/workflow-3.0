@@ -115,8 +115,97 @@ Stage Summary:
 - All templates include meaningful configs and correct edge handles
 
 ---
-Build Verification:
+Build Verification (Sprint 1):
 - `bun run lint` — passes clean
 - `npx next build` — compiles successfully, all routes generated
 - Dev server returns 200 on all pages
 - API endpoints tested: GET /api/workflows returns `{ ok: true, data: [] }`
+
+# OpenWorkflow — Sprint 2 Worklog
+
+---
+Task ID: 7
+Agent: Subagent (full-stack-developer)
+Task: Build Variable/Context System
+
+Work Log:
+- Created `/src/lib/variable-resolver.ts` — the template variable resolution engine
+- Supports syntax: `{{nodes.nodeId.field}}`, `{{input.field}}`, `{{config.key}}`, `{{context.variables.key}}`, `{{bare_variable}}`
+- `resolveVariables()` walks objects/arrays recursively, resolves all `{{...}}` templates
+- `evaluateSimpleCondition()` handles `===`, `!==`, `>`, `>=`, `<`, `<=`, `||`, `&&`
+- `simpleHash()` for deterministic classifier simulation
+- Updated engine.ts to track `nodeOutputs` map and resolve config before each node execution
+- Condition, switch, classifier nodes now use real expression evaluation
+
+Stage Summary:
+- Data flows between nodes via `{{variable}}` template resolution
+- Condition nodes evaluate real expressions instead of random
+- Classifier nodes produce deterministic results based on input hash
+- Backward compatible — existing workflows without templates still work
+
+---
+Task ID: 8
+Agent: Subagent (full-stack-developer)
+Task: Build Real AI Execution + Enhanced Canvas UX
+
+Work Log:
+- Created `/src/app/api/ai/completions/route.ts` — server-side proxy using z-ai-web-dev-sdk
+- Updated engine.ts LLM runner to call `/api/ai/completions` with config (model, temperature, systemPrompt)
+- Falls back to simulated responses on API failure
+- Installed @dagrejs/dagre for auto-layout
+- Created `/src/lib/auto-layout.ts` — dagre-based left-to-right auto-layout
+- Created `/src/components/edges/flow-edge.tsx` — custom edge with handle label badges
+- Updated page.tsx: Layout button, custom edge types, edge labels from sourceHandle
+- Updated node-palette.tsx: search input with real-time filtering
+
+Stage Summary:
+- LLM nodes call real AI API with simulated fallback
+- Auto-layout button arranges nodes cleanly
+- Custom edges show "true"/"false"/"approved"/"rejected" labels
+- Palette has search/filter functionality
+
+---
+Task ID: 9
+Agent: Subagent (full-stack-developer)
+Task: Build Workflow Versioning
+
+Work Log:
+- Added WorkflowVersion model to Prisma schema (id, workflowId, version, snapshot, changeNote)
+- Created `/src/app/api/workflows/[id]/versions/route.ts` — GET (list) + POST (create version)
+- Created `/src/app/api/workflows/[id]/versions/[version]/route.ts` — GET (single) + POST (restore)
+- Created `/src/components/workflow/version-history.tsx` — Sheet panel with timeline layout
+- Updated page.tsx: Save creates version snapshot, Version History toolbar button
+- Rollback creates new version entry (immutable history)
+
+Stage Summary:
+- Every save creates an immutable version snapshot
+- Version history timeline with preview and restore
+- Rollback is non-destructive (creates new version entry)
+- Auto-increment version numbers per workflow
+
+---
+Task ID: 10
+Agent: Subagent (full-stack-developer)
+Task: Build MCP Integration Layer
+
+Work Log:
+- Added MCPServer and MCPTool models to Prisma schema
+- Added MCPToolDefinition and MCPServerDefinition types to types.ts
+- Created `/src/lib/mcp-defaults.ts` — 8 builtin tools with full JSON Schema definitions
+- Created API routes: /api/mcp/servers, /api/mcp/servers/[id], /api/mcp/servers/[id]/tools, /api/mcp/tools
+- Created `/src/components/mcp/tool-browser.tsx` — split-panel dialog with search, categories, schema detail
+- Updated agent node config: tag-based tools input with "Browse" button
+- Added MCP Plug button to toolbar
+
+Stage Summary:
+- 8 builtin MCP tools: web_search, calculator, http_request, file_read, code_execute, database_query, email_send, slack_message
+- Custom tools can be registered via API
+- Agent node has tag-based tool selection with browser integration
+- Tool search, category filtering, and schema viewing
+
+---
+Build Verification (Sprint 2):
+- `npx next build` — compiles successfully, 13 routes generated
+- All API endpoints tested and working
+- MCP tools API returns 8 builtin tools with full schemas
+- Dev server running on port 3000

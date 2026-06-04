@@ -36,7 +36,7 @@ import {
 let nodeIdCounter = 0
 
 export default function WorkflowBuilder() {
-  const reactFlowRef = useRef<ReactFlowInstance>(null)
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
 
   const storeNodes = useWorkflowStore((s) => s.nodes)
   const storeEdges = useWorkflowStore((s) => s.edges)
@@ -110,7 +110,7 @@ export default function WorkflowBuilder() {
       if (!data) return
 
       const { type, category } = JSON.parse(data) as { type: NodeType; category: NodeCategory }
-      const position = reactFlowRef.current?.screenToFlowPosition({
+      const position = reactFlowInstance.current?.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       })
@@ -231,7 +231,7 @@ export default function WorkflowBuilder() {
         {/* Canvas */}
         <div className="flex-1">
           <ReactFlow
-            ref={reactFlowRef}
+            onInit={(instance) => { reactFlowInstance.current = instance }}
             nodes={flowNodes}
             edges={flowEdges}
             onNodesChange={handleNodesChange}

@@ -36,10 +36,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         return this.props.fallback
       }
       const errorMessage = this.state.error?.message || 'An unexpected error occurred in the workflow builder.'
-      // Don't show error boundary for hydration or chunk loading errors — just reset
-      if (errorMessage.includes('Minified React error') || errorMessage.includes('Loading chunk')) {
+      // Auto-recover from common recoverable errors
+      if (
+        errorMessage.includes('Minified React error') ||
+        errorMessage.includes('Loading chunk') ||
+        errorMessage.includes('Cannot read properties of undefined') ||
+        errorMessage.includes('Maximum update depth exceeded') ||
+        errorMessage.includes('Rendered fewer hooks')
+      ) {
         // Auto-reset after a brief delay for recoverable errors
-        setTimeout(() => this.handleReset(), 100)
+        setTimeout(() => this.handleReset(), 200)
         return this.props.children
       }
       return (

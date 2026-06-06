@@ -17,9 +17,9 @@ import type { NodeDefinition, EdgeDefinition } from '@/lib/types'
 
 const EXAMPLES = [
   'When a customer emails, classify the issue, search docs, draft a response, and escalate if confidence is below 80%',
-  'Build a support workflow that classifies tickets as urgent or normal, routes urgent ones to a human, and auto-replies to normal ones',
-  'Create a lead qualification workflow: webhook trigger, classify by company size, enrich in CRM, notify sales on Slack',
-  'Build an incident response workflow: API trigger, classify severity, notify the right team, create a ticket, escalate if unresolved',
+  'Build a support workflow: classify tickets by urgency, route urgent to a human, auto-reply to normal ones',
+  'Create a lead qualification workflow: webhook trigger, score the lead, create deal in CRM, notify sales on Slack',
+  'Build an incident monitor: check systems every 5 minutes, detect anomalies, escalate if unresolved after 15 min',
 ]
 
 interface WorkflowGeneratorProps {
@@ -71,7 +71,7 @@ export function WorkflowGenerator({ open, onOpenChange }: WorkflowGeneratorProps
         setName(workflow.name)
       }
 
-      // Add all nodes
+      // Add all nodes with proper positions
       for (const node of workflow.nodes) {
         addNode({
           id: node.id,
@@ -95,8 +95,8 @@ export function WorkflowGenerator({ open, onOpenChange }: WorkflowGeneratorProps
       }
 
       toast({
-        title: 'Workflow generated',
-        description: `Created ${workflow.nodes.length} nodes and ${workflow.edges.length} connections`,
+        title: 'Workflow generated!',
+        description: `Created ${workflow.nodes.length} nodes and ${workflow.edges.length} connections. Click Run to test it!`,
       })
 
       // Close dialog and reset form

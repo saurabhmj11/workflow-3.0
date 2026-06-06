@@ -227,7 +227,7 @@ export async function executeWorkflow(
   try {
   // Yield to the main thread so React can process the isRunning state change
   // before we start flooding with updateStep calls
-  await new Promise((r) => setTimeout(r, 16))
+  await new Promise((r) => setTimeout(r, 50))
 
   // Track outputs from each executed node for variable resolution
   const nodeOutputs: NodeOutputStore = {}
@@ -286,8 +286,8 @@ export async function executeWorkflow(
     useExecutionStore.getState().updateStep(runId, stepRunning)
 
     // Yield to the main thread so React can process the state change
-    // before we continue — prevents stacking too many renders
-    await new Promise((r) => setTimeout(r, 50))
+    // 100ms minimum between step updates to avoid overwhelming the renderer
+    await new Promise((r) => setTimeout(r, 100))
 
     try {
       // Resolve template variables in the node's config before execution

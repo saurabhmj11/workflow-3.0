@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Play,
+  Square,
   Undo2,
   Redo2,
   Trash2,
@@ -41,6 +42,7 @@ import {
   GitCommitHorizontal,
   Plug,
   Wand2,
+  Headphones,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
@@ -48,6 +50,7 @@ import { VersionHistory } from '@/components/workflow/version-history'
 import { autoLayout } from '@/lib/auto-layout'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { WORKFLOW_TEMPLATES } from '@/lib/templates'
 
 let nodeIdCounter = 0
 
@@ -206,13 +209,17 @@ export default function WorkflowBuilder() {
       // Ensure isRunning is reset even if engine crashes
       try {
         const store = useExecutionStore.getState()
-        if (store.isRunning && store.currentRunId) {
-          store.completeRun(store.currentRunId, { status: 'error', output: { error: 'Execution crashed' }, totalDurationMs: 0 })
+        if (store.isRunning) {
+          store.forceResetRunning()
+        }
+        if (store.currentRunId) {
+          store.completeRun(store.currentRunId, { status: 'error', output: { error: 'Execution crashed: ' + (err instanceof Error ? err.message : 'Unknown error') }, totalDurationMs: 0 })
         }
       } catch {
         // Last resort — force reset
         useExecutionStore.setState({ isRunning: false, currentRunId: null })
       }
+      toast({ title: 'Execution failed', description: err instanceof Error ? err.message : 'An unexpected error occurred', variant: 'destructive' })
     })
   }, [storeNodes, storeEdges, isRunning])
 
@@ -423,12 +430,23 @@ export default function WorkflowBuilder() {
           <div className="w-px h-5 bg-zinc-700 mx-1" />
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
-            onClick={handleRun}
-            disabled={nodeCount === 0 || isRunning}
+            className="h-8 gap-1.5 text-white disabled:opacity-50"
+            onClick={isRunning ? () => useExecutionStore.getState().forceResetRunning() : handleRun}
+            disabled={nodeCount === 0}
+            variant={isRunning ? 'destructive' : 'default'}
+            style={!isRunning ? { backgroundColor: '#059669' } : undefined}
           >
-            <Play className="h-3.5 w-3.5" />
-            Run
+            {isRunning ? (
+              <>
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5" />
+                Run
+              </>
+            )}
           </Button>
           {!hasTrigger && nodeCount > 0 && (
             <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">
@@ -448,36 +466,77 @@ export default function WorkflowBuilder() {
           {/* Empty state overlay */}
           {storeNodes.length === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="flex flex-col items-center gap-3 text-center pointer-events-auto">
-                <div className="h-14 w-14 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                  <Workflow className="h-7 w-7 text-zinc-500" />
+              <div className="flex flex-col items-center gap-4 text-center pointer-events-auto max-w-md">
+                <div className="h-16 w-16 rounded-2xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+                  <Workflow className="h-8 w-8 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-zinc-400">
-                    Start building your workflow
+                  <p className="text-base font-semibold text-zinc-200">
+                    Build your first AI workflow
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Describe it in English, or drag nodes from the palette
+                  <p className="text-sm text-zinc-500 mt-1.5">
+                    Describe it in English, pick a template, or drag nodes from the palette
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col items-center gap-2 w-full">
                   <Button
                     size="sm"
-                    className="h-8 gap-1.5 bg-violet-600 hover:bg-violet-500 text-white"
+                    className="h-9 gap-2 bg-violet-600 hover:bg-violet-500 text-white w-full"
                     onClick={() => setGeneratorOpen(true)}
                   >
-                    <Wand2 className="h-3.5 w-3.5" />
-                    AI Generate
+                    <Wand2 className="h-4 w-4" />
+                    AI Generate from Description
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5 border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-500"
-                    onClick={() => setTemplateOpen(true)}
-                  >
-                    <Lightbulb className="h-3.5 w-3.5" />
-                    Templates
-                  </Button>
+                  <div className="flex items-center gap-2 w-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5 border-cyan-500/30 text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/10 hover:border-cyan-500/50 flex-1"
+                      onClick={() => {
+                        // Load AI Support Employee template directly
+                        const template = WORKFLOW_TEMPLATES[0] // aiSupportEmployee is first
+                        if (!template) return
+                        reset()
+                        let counter = 0
+                        const nodeIdMap: string[] = []
+                        for (const node of template.nodes) {
+                          const id = `node-${++counter}-${Date.now()}`
+                          nodeIdMap.push(id)
+                          addNode({
+                            id,
+                            type: node.type,
+                            label: node.label,
+                            category: node.category,
+                            config: { ...node.config },
+                            position: { ...node.position },
+                          })
+                        }
+                        for (const edge of template.edges) {
+                          addEdgeToStore({
+                            id: `edge-${++counter}-${Date.now()}`,
+                            source: nodeIdMap[edge.sourceIndex],
+                            target: nodeIdMap[edge.targetIndex],
+                            sourceHandle: edge.sourceHandle,
+                            targetHandle: edge.targetHandle,
+                          })
+                        }
+                        setName(template.name)
+                        toast({ title: 'AI Support Employee loaded!', description: 'Click Run to test the workflow' })
+                      }}
+                    >
+                      <Headphones className="h-3.5 w-3.5" />
+                      AI Support Employee
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5 border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-500 flex-1"
+                      onClick={() => setTemplateOpen(true)}
+                    >
+                      <Lightbulb className="h-3.5 w-3.5" />
+                      All Templates
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

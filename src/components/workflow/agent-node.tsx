@@ -42,8 +42,9 @@ const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {
 const FALLBACK_ICON = Zap
 
 function AgentNode({ data, selected, id }: NodeProps) {
-  const nodeType = data.nodeType as NodeType
-  const label = data.label as string
+  // Guard against missing data during rapid re-renders
+  const nodeType = (data?.nodeType as NodeType) ?? 'api'
+  const label = (data?.label as string) ?? 'Unknown'
   const cat = getCategoryForType(nodeType)
   const categoryIcons = ALL_ICONS[cat.category] ?? {}
   const Icon = categoryIcons[nodeType] ?? FALLBACK_ICON
@@ -51,7 +52,11 @@ function AgentNode({ data, selected, id }: NodeProps) {
 
   // Read execution status for this node from the execution store — use the pre-computed stable map
   const nodeStatus: NodeExecutionStatus | null = useExecutionStore((state) => {
-    return state.nodeStatusMap[id] ?? null
+    try {
+      return state.nodeStatusMap[id] ?? null
+    } catch {
+      return null
+    }
   })
 
   // Determine glow color based on category

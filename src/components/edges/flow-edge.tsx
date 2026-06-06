@@ -13,6 +13,11 @@ export function FlowEdge({
   markerEnd,
   selected,
 }: EdgeProps) {
+  // Guard against missing coordinates during rapid re-renders
+  if (sourceX == null || sourceY == null || targetX == null || targetY == null) {
+    return null
+  }
+
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,

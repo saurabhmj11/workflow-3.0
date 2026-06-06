@@ -285,8 +285,9 @@ export async function executeWorkflow(
     }
     useExecutionStore.getState().updateStep(runId, stepRunning)
 
-    // Small yield between state updates to let React process
-    await new Promise((r) => setTimeout(r, 4))
+    // Yield to the main thread so React can process the state change
+    // before we continue — prevents stacking too many renders
+    await new Promise((r) => setTimeout(r, 50))
 
     try {
       // Resolve template variables in the node's config before execution

@@ -6,10 +6,9 @@ import {
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
   type Connection,
   type ReactFlowInstance,
+  type NodeChange,
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -123,12 +122,12 @@ export default function WorkflowBuilder() {
     [storeEdges, nodeStatusMap]
   )
 
-  const [, , onNodesChange] = useNodesState(flowNodes)
-  const [, , onEdgesChange] = useEdgesState(flowEdges)
-
+  // ─── Controlled mode: apply node changes directly to store ───
+  // Previously used useNodesState/useEdgesState which created conflicting internal state
+  // when combined with controlled `nodes={flowNodes}`/`edges={flowEdges}` props.
+  // This caused stale state and crashes when nodeStatusMap updated during execution.
   const handleNodesChange = useCallback(
-    (changes: Parameters<typeof onNodesChange>[0]) => {
-      onNodesChange(changes)
+    (changes: NodeChange[]) => {
       for (const change of changes) {
         if (change.type === 'position' && change.position) {
           updateNodePosition(change.id, change.position)
@@ -138,7 +137,7 @@ export default function WorkflowBuilder() {
         }
       }
     },
-    [onNodesChange, updateNodePosition, removeNode]
+    [updateNodePosition, removeNode]
   )
 
   const onConnect = useCallback(
@@ -198,13 +197,22 @@ export default function WorkflowBuilder() {
       return
     }
     // Snapshot nodes/edges immediately to avoid stale closure
-    const nodesSnapshot = [...storeNodes]
+    const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
     const edgesSnapshot = [...storeEdges]
 
     // Fire-and-forget with full error handling
     executeWorkflow('wf-demo', nodesSnapshot, edgesSnapshot).catch((err) => {
       console.error('[OpenWorkflow] Execution failed:', err)
-      // Don't re-throw — the engine handles its own error state
+      // Ensure isRunning is reset even if engine crashes
+      try {
+        const store = useExecutionStore.getState()
+        if (store.isRunning && store.currentRunId) {
+          store.completeRun(store.currentRunId, { status: 'error', output: { error: 'Execution crashed' }, totalDurationMs: 0 })
+        }
+      } catch {
+        // Last resort — force reset
+        useExecutionStore.setState({ isRunning: false, currentRunId: null })
+      }
     })
   }, [storeNodes, storeEdges, isRunning])
 

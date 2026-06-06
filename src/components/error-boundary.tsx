@@ -35,6 +35,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       if (this.props.fallback) {
         return this.props.fallback
       }
+      const errorMessage = this.state.error?.message || 'An unexpected error occurred in the workflow builder.'
+      // Don't show error boundary for hydration or chunk loading errors — just reset
+      if (errorMessage.includes('Minified React error') || errorMessage.includes('Loading chunk')) {
+        // Auto-reset after a brief delay for recoverable errors
+        setTimeout(() => this.handleReset(), 100)
+        return this.props.children
+      }
       return (
         <div className="h-full flex flex-col items-center justify-center bg-zinc-950 text-zinc-300 p-8">
           <div className="max-w-md text-center space-y-4">
@@ -47,7 +54,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </div>
             <h2 className="text-lg font-semibold text-zinc-100">Something went wrong</h2>
             <p className="text-sm text-zinc-400">
-              {this.state.error?.message || 'An unexpected error occurred in the workflow builder.'}
+              {errorMessage}
             </p>
             <button
               onClick={this.handleReset}

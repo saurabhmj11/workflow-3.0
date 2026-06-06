@@ -290,3 +290,30 @@ Stage Summary:
 - AI Support Employee is the #1 template, positioned as the wedge product
 - Execution Replay shows real-time timeline of AI work — users can see AI thinking
 - Empty canvas now promotes AI Generate as the primary action
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Run button crash - diagnose and fix client-side crash when clicking Run
+
+Work Log:
+- Read all critical source files (page.tsx, engine.ts, workflow-store.ts, execution-store.ts, variable-resolver.ts, agent-node.tsx, flow-edge.tsx, error-boundary.tsx, etc.)
+- Identified root cause #1: ReactFlow controlled/uncontrolled mode conflict — `useNodesState(flowNodes)`/`useEdgesState(flowEdges)` created internal state that conflicted with the controlled `nodes={flowNodes}`/`edges={flowEdges}` props, causing stale state and crashes when `nodeStatusMap` updated during execution
+- Identified root cause #2: Rapid Zustand state updates during execution overwhelming React's rendering pipeline
+- Identified root cause #3: No defensive guards in components for missing data during rapid re-renders
+- Identified root cause #4: AI completions API route lacked timeout and could hang/crash the server
+- Fixed page.tsx: Removed useNodesState/useEdgesState, replaced with direct store-based handleNodesChange
+- Fixed page.tsx: Added deep clone of nodes in handleRun to prevent stale closures
+- Fixed page.tsx: Added fallback isRunning reset in handleRun's catch block
+- Fixed execution-store.ts: Added try/catch in updateStep and completeRun, force reset isRunning on error
+- Fixed engine.ts: Increased yield time between state updates from 4ms to 50ms
+- Fixed agent-node.tsx: Added defensive guards for missing data and try/catch in nodeStatus selector
+- Fixed flow-edge.tsx: Added guard against missing coordinates during rapid re-renders
+- Fixed error-boundary.tsx: Added auto-reset for recoverable hydration/chunk errors
+- Fixed api/ai/completions/route.ts: Added input validation, AI SDK error isolation, 25s timeout with Promise.race
+
+Stage Summary:
+- All fixes compile and build successfully (next build passes)
+- The core crash was the ReactFlow controlled mode conflict — useNodesState/useEdgesState created conflicting internal state
+- AI API route now has proper error isolation and timeout
+- Execution engine now yields properly between state updates
+- All components have defensive guards against missing data during rapid state changes

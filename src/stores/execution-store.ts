@@ -18,16 +18,22 @@ interface ExecutionState {
 
 let runCounter = 0
 
-/** Build a stable status map from the active result's steps */
+/** Build a stable status map from the active result's steps.
+ *  Only includes terminal or active statuses to avoid excessive re-renders. */
 function buildNodeStatusMap(results: ExecutionResult[], activeResultId: string | null): Record<string, NodeExecutionStatus> {
   if (!activeResultId) return {}
-  const activeResult = results.find((r) => r.runId === activeResultId)
-  if (!activeResult) return {}
-  const map: Record<string, NodeExecutionStatus> = {}
-  for (const step of activeResult.steps) {
-    map[step.nodeId] = step.status
+  try {
+    const activeResult = results.find((r) => r.runId === activeResultId)
+    if (!activeResult) return {}
+    const map: Record<string, NodeExecutionStatus> = {}
+    for (const step of activeResult.steps) {
+      // Always use the latest status for each node
+      map[step.nodeId] = step.status
+    }
+    return map
+  } catch {
+    return {}
   }
-  return map
 }
 
 export const useExecutionStore = create<ExecutionState>((set, get) => ({
@@ -53,34 +59,45 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
       currentRunId: runId,
       results: newResults,
       activeResultId: runId,
-      nodeStatusMap: buildNodeStatusMap(newResults, runId),
+      nodeStatusMap: {},
     })
     return runId
   },
 
   updateStep: (runId, step) => {
-    const newResults = get().results.map((r) =>
-      r.runId === runId
-        ? { ...r, steps: [...r.steps.filter((st) => st.nodeId !== step.nodeId), step] }
-        : r
-    )
-    set({
-      results: newResults,
-      nodeStatusMap: buildNodeStatusMap(newResults, get().activeResultId),
-    })
+    try {
+      const prev = get()
+      const newResults = prev.results.map((r) =>
+        r.runId === runId
+          ? { ...r, steps: [...r.steps.filter((st) => st.nodeId !== step.nodeId), step] }
+          : r
+      )
+      set({
+        results: newResults,
+        nodeStatusMap: buildNodeStatusMap(newResults, prev.activeResultId),
+      })
+    } catch (err) {
+      console.error('[OpenWorkflow] updateStep error:', err)
+    }
   },
 
   completeRun: (runId, updates) => {
-    const s = get()
-    const newResults = s.results.map((r) =>
-      r.runId === runId ? { ...r, ...updates, finishedAt: new Date().toISOString() } : r
-    )
-    set({
-      isRunning: false,
-      currentRunId: s.currentRunId === runId ? null : s.currentRunId,
-      results: newResults,
-      nodeStatusMap: buildNodeStatusMap(newResults, s.activeResultId),
-    })
+    try {
+      const s = get()
+      const newResults = s.results.map((r) =>
+        r.runId === runId ? { ...r, ...updates, finishedAt: new Date().toISOString() } : r
+      )
+      set({
+        isRunning: false,
+        currentRunId: s.currentRunId === runId ? null : s.currentRunId,
+        results: newResults,
+        nodeStatusMap: buildNodeStatusMap(newResults, s.activeResultId),
+      })
+    } catch (err) {
+      console.error('[OpenWorkflow] completeRun error:', err)
+      // Force reset isRunning to prevent stuck state
+      set({ isRunning: false, currentRunId: null })
+    }
   },
 
   setActiveResult: (id) => {

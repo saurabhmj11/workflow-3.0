@@ -18,13 +18,14 @@ import { nodeTypes } from '@/components/workflow/agent-node'
 import { FlowEdge } from '@/components/edges/flow-edge'
 import { NodePalette } from '@/components/palette/node-palette'
 import { ApprovalQueue } from '@/components/approval/approval-queue'
-import { ExecutionPanel } from '@/components/execution/execution-panel'
+import { ExecutionReplay } from '@/components/execution/execution-replay'
 import { NodeConfigPanel } from '@/components/config/node-config-panel'
 import { useWorkflowStore, nodeToFlow } from '@/stores/workflow-store'
 import { useExecutionStore } from '@/stores/execution-store'
 import { executeWorkflow } from '@/lib/engine'
 import { getCategoryForType, type NodeType, type NodeCategory } from '@/lib/types'
 import { TemplateGallery } from '@/components/workflow/template-gallery'
+import { WorkflowGenerator } from '@/components/workflow/workflow-generator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,6 +41,7 @@ import {
   LayoutGrid,
   GitCommitHorizontal,
   Plug,
+  Wand2,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
@@ -55,6 +57,7 @@ const edgeTypes = { flow: FlowEdge }
 export default function WorkflowBuilder() {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
+  const [generatorOpen, setGeneratorOpen] = useState(false)
   const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
@@ -185,21 +188,24 @@ export default function WorkflowBuilder() {
   )
 
   const handleRun = useCallback(() => {
-    if (storeNodes.length === 0) return
+    if (storeNodes.length === 0) {
+      toast({ title: 'No nodes', description: 'Add some nodes to the canvas before running' })
+      return
+    }
     // Prevent double-execution
     if (isRunning) {
       toast({ title: 'Already running', description: 'A workflow execution is already in progress' })
       return
     }
-    try {
-      executeWorkflow('wf-demo', storeNodes, storeEdges).catch((err) => {
-        console.error('[OpenWorkflow] Execution failed:', err)
-        toast({ title: 'Execution error', description: err instanceof Error ? err.message : 'Workflow execution failed', variant: 'destructive' })
-      })
-    } catch (err) {
-      console.error('[OpenWorkflow] Failed to start execution:', err)
-      toast({ title: 'Execution error', description: 'Failed to start workflow execution', variant: 'destructive' })
-    }
+    // Snapshot nodes/edges immediately to avoid stale closure
+    const nodesSnapshot = [...storeNodes]
+    const edgesSnapshot = [...storeEdges]
+
+    // Fire-and-forget with full error handling
+    executeWorkflow('wf-demo', nodesSnapshot, edgesSnapshot).catch((err) => {
+      console.error('[OpenWorkflow] Execution failed:', err)
+      // Don't re-throw — the engine handles its own error state
+    })
   }, [storeNodes, storeEdges, isRunning])
 
   const handleAutoLayout = useCallback(() => {
@@ -368,6 +374,9 @@ export default function WorkflowBuilder() {
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:text-violet-300" onClick={() => setGeneratorOpen(true)} title="AI Generate">
+            <Wand2 className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={() => setTemplateOpen(true)} title="Templates">
             <Lightbulb className="h-3.5 w-3.5" />
           </Button>
@@ -440,18 +449,28 @@ export default function WorkflowBuilder() {
                     Start building your workflow
                   </p>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Drag nodes from the palette, or pick a template
+                    Describe it in English, or drag nodes from the palette
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-500"
-                  onClick={() => setTemplateOpen(true)}
-                >
-                  <Lightbulb className="h-3.5 w-3.5" />
-                  Browse Templates
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 bg-violet-600 hover:bg-violet-500 text-white"
+                    onClick={() => setGeneratorOpen(true)}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                    AI Generate
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-500"
+                    onClick={() => setTemplateOpen(true)}
+                  >
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    Templates
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -489,6 +508,9 @@ export default function WorkflowBuilder() {
             />
           </ReactFlow>
 
+          {/* Workflow Generator Dialog */}
+          <WorkflowGenerator open={generatorOpen} onOpenChange={setGeneratorOpen} />
+
           {/* Template Gallery Dialog */}
           <TemplateGallery open={templateOpen} onOpenChange={setTemplateOpen} />
 
@@ -517,7 +539,7 @@ export default function WorkflowBuilder() {
                 <ApprovalQueue />
               </div>
               <div className="border-t border-zinc-800 flex-1 overflow-hidden">
-                <ExecutionPanel />
+                <ExecutionReplay />
               </div>
             </>
           )}

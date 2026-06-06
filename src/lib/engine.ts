@@ -49,15 +49,12 @@ async function runNode(
 
         if (expression) {
           try {
-            // The expression has already been resolved by the variable engine,
-            // so {{...}} patterns are replaced with actual values.
-            // We pass the resolved config as the context for evaluation.
             conditionMet = evaluateSimpleCondition(expression, config)
           } catch {
             conditionMet = false
           }
         } else {
-          conditionMet = Math.random() > 0.4 // fallback for no expression
+          conditionMet = Math.random() > 0.4
         }
         return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression } }
       }
@@ -66,7 +63,6 @@ async function runNode(
         const rawCases = config.cases
 
         try {
-          // Cases can be: array of objects [{label, expression}], record {name: expr}, or comma-separated string
           if (Array.isArray(rawCases) && rawCases.length > 0) {
             for (const c of rawCases) {
               if (c && typeof c === 'object') {
@@ -86,7 +82,6 @@ async function runNode(
               }
             }
           } else {
-            // Fallback: deterministic based on input hash
             const inputHash = simpleHash(JSON.stringify(input))
             matchedCase = inputHash % 2 === 0 ? 'case1' : 'case2'
           }
@@ -135,7 +130,6 @@ async function runNode(
               costUsd: Math.round(cost * 10000) / 10000,
             }
           } else {
-            // Fallback to simulated on API error
             await delay(800 + Math.random() * 1500)
             const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
             const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
@@ -146,7 +140,6 @@ async function runNode(
             }
           }
         } catch {
-          // Fallback to simulated on network error
           await delay(800 + Math.random() * 1500)
           const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
           const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
@@ -158,10 +151,8 @@ async function runNode(
         }
       }
 
-      // Classifier: deterministic classification using input hash
       if (node.type === 'classifier') {
         const rawCategories = config.categories
-        // Handle both comma-separated strings and arrays
         let categories: string[]
         if (Array.isArray(rawCategories)) {
           categories = rawCategories.map(String)
@@ -175,7 +166,7 @@ async function runNode(
         const inputStr = JSON.stringify(input)
         const hash = simpleHash(inputStr)
         const category = categories[hash % categories.length] ?? categories[0] ?? 'unknown'
-        const confidence = 70 + (hash % 30) // 70-99%
+        const confidence = 70 + (hash % 30)
         return {
           output: {
             classification: category,
@@ -188,7 +179,6 @@ async function runNode(
         }
       }
 
-      // For other AI types (agent, rag, summarizer), keep simulated for now.
       await delay(800 + Math.random() * 1500)
       const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
       const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
@@ -211,7 +201,6 @@ async function runNode(
       return { output: input }
   }
   } catch (err) {
-    // If any node execution fails internally, return a safe output
     console.error(`[OpenWorkflow] Node runner error (${node.type}):`, err)
     return { output: { error: err instanceof Error ? err.message : 'Node execution failed', input } }
   }
@@ -225,12 +214,10 @@ export async function executeWorkflow(
   edges: EdgeDefinition[],
   variables: Record<string, unknown> = {}
 ): Promise<void> {
-  const executionStore = useExecutionStore.getState()
-  const approvalStore = useApprovalStore.getState()
-
+  // Access stores — use .getState() for latest state each time to avoid stale closures
   let runId: string
   try {
-    runId = executionStore.startRun(workflowId)
+    runId = useExecutionStore.getState().startRun(workflowId)
   } catch (err) {
     console.error('[OpenWorkflow] Failed to start run:', err)
     return
@@ -238,6 +225,10 @@ export async function executeWorkflow(
 
   // Wrap entire execution in try/catch to prevent unhandled crashes
   try {
+  // Yield to the main thread so React can process the isRunning state change
+  // before we start flooding with updateStep calls
+  await new Promise((r) => setTimeout(r, 16))
+
   // Track outputs from each executed node for variable resolution
   const nodeOutputs: NodeOutputStore = {}
 
@@ -260,7 +251,7 @@ export async function executeWorkflow(
     }
   })
   if (triggerNodes.length === 0) {
-    executionStore.completeRun(runId, { status: 'error', output: { error: 'No trigger node found' }, totalDurationMs: 0 })
+    useExecutionStore.getState().completeRun(runId, { status: 'error', output: { error: 'No trigger node found' }, totalDurationMs: 0 })
     return
   }
 
@@ -292,7 +283,10 @@ export async function executeWorkflow(
       input,
       status: 'running',
     }
-    executionStore.updateStep(runId, stepRunning)
+    useExecutionStore.getState().updateStep(runId, stepRunning)
+
+    // Small yield between state updates to let React process
+    await new Promise((r) => setTimeout(r, 4))
 
     try {
       // Resolve template variables in the node's config before execution
@@ -314,7 +308,7 @@ export async function executeWorkflow(
         tokenUsage: result.tokenUsage,
         costUsd: result.costUsd,
       }
-      executionStore.updateStep(runId, stepDone)
+      useExecutionStore.getState().updateStep(runId, stepDone)
 
       // Store this node's output for variable resolution by subsequent nodes
       nodeOutputs[node.id] = result.output
@@ -332,8 +326,8 @@ export async function executeWorkflow(
           createdAt: new Date().toISOString(),
           slaDeadline: new Date(Date.now() + 3600000).toISOString(),
         }
-        approvalStore.addRequest(approval)
-        executionStore.completeRun(runId, { status: 'awaiting_approval' })
+        useApprovalStore.getState().addRequest(approval)
+        useExecutionStore.getState().completeRun(runId, { status: 'awaiting_approval' })
         return
       }
 
@@ -342,7 +336,6 @@ export async function executeWorkflow(
       for (const edge of nodeEdges) {
         const targetNode = nodes.find((n) => n.id === edge.target)
         if (targetNode) {
-          // For condition/approval nodes, only follow matching handle
           if (node.type === 'condition') {
             const conditionResult = result.output as { conditionMet: boolean }
             if (edge.sourceHandle === 'true' && conditionResult?.conditionMet) {
@@ -376,22 +369,22 @@ export async function executeWorkflow(
         status: 'error',
         error: err instanceof Error ? err.message : 'Unknown error',
       }
-      executionStore.updateStep(runId, stepError)
-      executionStore.completeRun(runId, { status: 'error', output: { error: stepError.error }, totalDurationMs: 0 })
+      useExecutionStore.getState().updateStep(runId, stepError)
+      useExecutionStore.getState().completeRun(runId, { status: 'error', output: { error: stepError.error }, totalDurationMs: 0 })
       return
     }
   }
 
-  // Calculate totals
-  const result = useExecutionStore.getState().results.find((r) => r.runId === runId)
-  const totalDuration = result?.steps.reduce((acc, s) => {
+  // Calculate totals — re-read store to get latest state
+  const finalResult = useExecutionStore.getState().results.find((r) => r.runId === runId)
+  const totalDuration = finalResult?.steps.reduce((acc, s) => {
     if (s.startedAt && s.finishedAt) return acc + (new Date(s.finishedAt).getTime() - new Date(s.startedAt).getTime())
     return acc
   }, 0) ?? 0
 
-  const totalCost = result?.steps.reduce((acc, s) => acc + (s.costUsd ?? 0), 0) ?? 0
+  const totalCost = finalResult?.steps.reduce((acc, s) => acc + (s.costUsd ?? 0), 0) ?? 0
 
-  executionStore.completeRun(runId, {
+  useExecutionStore.getState().completeRun(runId, {
     status: 'success',
     totalDurationMs: totalDuration,
     totalCostUsd: Math.round(totalCost * 10000) / 10000,
@@ -401,7 +394,7 @@ export async function executeWorkflow(
     // Top-level catch for any unhandled error during execution
     console.error('[OpenWorkflow] Unhandled execution error:', err)
     try {
-      executionStore.completeRun(runId, {
+      useExecutionStore.getState().completeRun(runId, {
         status: 'error',
         output: { error: err instanceof Error ? err.message : 'Unknown execution error' },
         totalDurationMs: 0,

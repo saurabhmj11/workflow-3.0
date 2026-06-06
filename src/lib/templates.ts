@@ -391,9 +391,238 @@ const contentReviewPipeline: WorkflowTemplate = {
   ],
 }
 
+// ─── 5. AI Support Employee (Wedge Product) ────────
+// The production-ready support workflow that solves a real business problem.
+// Email Trigger → Classifier → RAG → LLM → Approval → Email
+// With escalation path for low-confidence cases.
+
+const aiSupportEmployee: WorkflowTemplate = {
+  id: 'ai-support-employee',
+  name: 'AI Support Employee',
+  description:
+    'Your AI support agent that classifies tickets, searches your knowledge base, drafts responses, and routes difficult cases to humans. Start here — this is the workflow that replaces your first-line support.',
+  icon: 'Headset',
+  category: 'support',
+  difficulty: 'beginner',
+  nodes: [
+    {
+      type: 'email',
+      label: 'Customer Email',
+      category: 'trigger',
+      config: {
+        imapServer: 'imap.gmail.com',
+        folder: 'INBOX',
+      },
+      position: { x: 250, y: 0 },
+    },
+    {
+      type: 'classifier',
+      label: 'Classify Issue',
+      category: 'ai',
+      config: {
+        categories: 'billing,technical,account,general,urgent',
+        model: 'gpt-4o',
+      },
+      position: { x: 250, y: 150 },
+    },
+    {
+      type: 'condition',
+      label: 'Confidence > 80%?',
+      category: 'logic',
+      config: {
+        expression: 'confidence >= 80',
+      },
+      position: { x: 250, y: 300 },
+    },
+    {
+      type: 'rag',
+      label: 'Search Knowledge Base',
+      category: 'ai',
+      config: {
+        vectorStore: 'pinecone',
+        topK: 5,
+        similarityThreshold: 0.7,
+      },
+      position: { x: 50, y: 450 },
+    },
+    {
+      type: 'llm',
+      label: 'Draft Response',
+      category: 'ai',
+      config: {
+        model: 'gpt-4o',
+        systemPrompt: 'You are a helpful support agent. Draft a professional, empathetic response to the customer based on the knowledge base articles found. Be specific and actionable. If the knowledge base doesn\'t have enough information, say so honestly.',
+        temperature: 0.5,
+        maxTokens: 1024,
+      },
+      position: { x: 50, y: 600 },
+    },
+    {
+      type: 'approval',
+      label: 'Human Review',
+      category: 'human',
+      config: {
+        assignee: 'support-lead@company.com',
+        slaMinutes: 30,
+        message: 'AI has drafted a response. Please review and approve or edit before sending.',
+      },
+      position: { x: 50, y: 750 },
+    },
+    {
+      type: 'email',
+      label: 'Send Response',
+      category: 'action',
+      config: {
+        to: '{{input.sender}}',
+        subject: 'Re: {{input.subject}}',
+        body: '{{nodes.node-5.output.response}}',
+      },
+      position: { x: 50, y: 900 },
+    },
+    {
+      type: 'escalation',
+      label: 'Escalate to Human',
+      category: 'human',
+      config: {
+        escalationPath: ['senior-support@company.com', 'support-manager@company.com'],
+        priority: 'high',
+      },
+      position: { x: 450, y: 450 },
+    },
+    {
+      type: 'slack',
+      label: 'Notify Team',
+      category: 'action',
+      config: {
+        channel: '#support-escalations',
+        message: '🔄 Low-confidence ticket escalated. Classification: {{classification}}. Confidence: {{confidence}}%. Needs human attention.',
+      },
+      position: { x: 450, y: 600 },
+    },
+  ],
+  edges: [
+    { sourceIndex: 0, targetIndex: 1, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 1, targetIndex: 2, sourceHandle: 'default', targetHandle: 'input' },
+    // High confidence path: RAG → LLM → Approval → Email
+    { sourceIndex: 2, targetIndex: 3, sourceHandle: 'true', targetHandle: 'input' },
+    { sourceIndex: 3, targetIndex: 4, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 4, targetIndex: 5, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 5, targetIndex: 6, sourceHandle: 'approved', targetHandle: 'input' },
+    // Low confidence path: Escalation → Slack
+    { sourceIndex: 2, targetIndex: 7, sourceHandle: 'false', targetHandle: 'input' },
+    { sourceIndex: 7, targetIndex: 8, sourceHandle: 'default', targetHandle: 'input' },
+  ],
+}
+
+// ─── 6. SDR Employee ────────────────────────────────
+// Webhook → Classifier → Condition → (qualified) CRM + Email | (unqualified) Nurture
+
+const sdrEmployee: WorkflowTemplate = {
+  id: 'sdr-employee',
+  name: 'SDR Employee',
+  description:
+    'AI sales development rep that qualifies inbound leads, enriches them in your CRM, and routes hot leads to your sales team. nurture the rest.',
+  icon: 'UserSearch',
+  category: 'sales',
+  difficulty: 'beginner',
+  nodes: [
+    {
+      type: 'webhook',
+      label: 'Lead Form Submit',
+      category: 'trigger',
+      config: { url: 'https://hooks.company.com/leads', secret: '' },
+      position: { x: 250, y: 0 },
+    },
+    {
+      type: 'classifier',
+      label: 'Score Lead',
+      category: 'ai',
+      config: {
+        categories: 'hot,warm,cold',
+        model: 'gpt-4o',
+      },
+      position: { x: 250, y: 150 },
+    },
+    {
+      type: 'condition',
+      label: 'Hot Lead?',
+      category: 'logic',
+      config: {
+        expression: 'classification === "hot"',
+      },
+      position: { x: 250, y: 300 },
+    },
+    {
+      type: 'crm',
+      label: 'Create Deal',
+      category: 'action',
+      config: {
+        action: 'create',
+        objectType: 'deal',
+        fields: '{"stage": "qualified", "source": "inbound"}',
+      },
+      position: { x: 50, y: 450 },
+    },
+    {
+      type: 'email',
+      label: 'Welcome Email',
+      category: 'action',
+      config: {
+        to: '{{input.email}}',
+        subject: 'Thanks for reaching out!',
+        body: 'Hi {{input.name}}, thanks for your interest! A member of our team will be in touch within the hour.',
+      },
+      position: { x: 50, y: 600 },
+    },
+    {
+      type: 'slack',
+      label: 'Alert Sales Team',
+      category: 'action',
+      config: {
+        channel: '#hot-leads',
+        message: '🔥 Hot lead just came in! {{input.name}} from {{input.company}}. Check CRM for details.',
+      },
+      position: { x: 50, y: 750 },
+    },
+    {
+      type: 'llm',
+      label: 'Write Nurture Email',
+      category: 'ai',
+      config: {
+        model: 'gpt-4o-mini',
+        systemPrompt: 'Write a warm, personalized nurture email for this lead. Be helpful, not salesy. Share a relevant resource.',
+        temperature: 0.7,
+      },
+      position: { x: 450, y: 450 },
+    },
+    {
+      type: 'email',
+      label: 'Send Nurture',
+      category: 'action',
+      config: {
+        to: '{{input.email}}',
+        subject: 'Thought you might find this useful',
+        body: '{{nodes.node-7.output.response}}',
+      },
+      position: { x: 450, y: 600 },
+    },
+  ],
+  edges: [
+    { sourceIndex: 0, targetIndex: 1, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 1, targetIndex: 2, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 2, targetIndex: 3, sourceHandle: 'true', targetHandle: 'input' },
+    { sourceIndex: 3, targetIndex: 4, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 4, targetIndex: 5, sourceHandle: 'default', targetHandle: 'input' },
+    { sourceIndex: 2, targetIndex: 6, sourceHandle: 'false', targetHandle: 'input' },
+    { sourceIndex: 6, targetIndex: 7, sourceHandle: 'default', targetHandle: 'input' },
+  ],
+}
+
 // ─── Export all templates ─────────────────────────
 
 export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
+  aiSupportEmployee,
+  sdrEmployee,
   customerSupportTriage,
   leadQualificationPipeline,
   incidentResponseWorkflow,

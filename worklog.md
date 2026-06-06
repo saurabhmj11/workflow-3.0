@@ -236,6 +236,8 @@ Fixes applied:
 6. **execution-panel.tsx** — Wrapped `getCategoryForType` in try/catch with NODE_CATEGORIES fallback.
 7. **error-boundary.tsx** — New React error boundary component with user-friendly error UI and retry button.
 8. **global-error.tsx** — New Next.js global error handler for uncaught client errors.
+9. **engine.ts (additional)** — Replaced stale store references with fresh `.getState()` calls each time. Added `await setTimeout(16)` yield after `startRun` to let React process the isRunning state change before flooding with updateStep calls. Added small yields between state updates to prevent render cascading.
+10. **page.tsx handleRun** — Simplified to fire-and-forget with node/edge snapshots. Removed try/catch wrapper that could mask errors.
 
 Stage Summary:
 - Build compiles successfully: `npx next build` — ✓ Compiled successfully
@@ -244,3 +246,47 @@ Stage Summary:
 - Run button has double-click prevention and disabled state during execution
 - Safe fallbacks for all type lookups and config access
 - Production server verified: page loads 200, API endpoints working
+
+# OpenWorkflow — Product Pivot: AI Employee Wedge
+
+---
+Task ID: 12
+Agent: Main
+Task: Build "Generate Workflow" feature + AI Support Employee template + Execution Replay
+
+Work Log:
+- Strategic pivot: Stop building infrastructure, start building product with ONE concrete use case (AI Support Employee)
+- Created `/src/app/api/workflows/generate/route.ts` — AI-powered workflow generator API
+  - Uses z-ai-web-dev-sdk GPT-4o to convert natural language → workflow JSON
+  - Validates and normalizes generated workflows (fills missing fields, infers categories)
+  - Handles markdown fences in AI output, graceful error responses
+- Created `/src/components/workflow/workflow-generator.tsx` — "Generate Workflow" dialog
+  - Textarea for natural language description
+  - 4 example prompts for common workflows
+  - Loading state with spinner, error display
+  - Generates and loads workflow into canvas automatically
+- Created `/src/components/execution/execution-replay.tsx` — Visual execution timeline
+  - Timeline-style step display with dot indicators (running=blue pulse, success=green, error=red)
+  - Category icons per step type (Zap=trigger, Brain=AI, UserCheck=human, etc.)
+  - Duration, token count, and cost per step
+  - Expandable output preview with JSON formatting
+  - Status badges for overall execution state
+- Added AI Support Employee template to templates.ts
+  - Email → Classifier → Condition → (high confidence) RAG → LLM → Approval → Email
+  - Low confidence path: Escalation → Slack notification
+  - Production-ready with real configs (IMAP server, model selection, system prompts)
+- Added SDR Employee template to templates.ts
+  - Webhook → Classifier → Condition → (hot) CRM + Email + Slack | (cold) LLM nurture → Email
+- Updated page.tsx:
+  - Added Wand2 (AI Generate) button to toolbar — prominent violet color
+  - Added WorkflowGenerator dialog
+  - Replaced ExecutionPanel with ExecutionReplay
+  - Updated empty state: "AI Generate" as primary CTA, "Templates" as secondary
+  - Both CTAs side by side
+
+Stage Summary:
+- Build compiles successfully with new `/api/workflows/generate` route
+- "That's cool" feature: Type "Build a support workflow" → AI creates the full workflow
+- AI Support Employee is the #1 template, positioned as the wedge product
+- Execution Replay shows real-time timeline of AI work — users can see AI thinking
+- Empty canvas now promotes AI Generate as the primary action

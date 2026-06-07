@@ -412,3 +412,45 @@ Stage Summary:
 - AI produces clean, well-structured workflows with proper node types, configs, and positions
 - Smart template matching saves AI calls and provides instant results
 - Auto-layout ensures generated workflows look clean on the canvas
+
+# OpenWorkflow — Week 3: AI Support Employee Demo & Product Polish
+
+---
+Task ID: 1
+Agent: Main
+Task: Build AI Support Employee Demo mode, product branding, and polish for demo-readiness
+
+Work Log:
+- Created `/src/components/workflow/ai-employee-demo.tsx` — The killer demo feature
+  - 3 pre-built demo emails: billing (normal), urgent production issue, account setup question
+  - Custom email input option for users to write their own
+  - Real-time animated pipeline execution showing each step:
+    - Email Received → Classify Issue → Confidence Check → (high) Search KB → Draft Response → Approve → Send
+    - Low confidence path: Escalate to Human → Notify Team on Slack
+  - Each pipeline step shows detailed output (classification result, confidence score, KB articles found, drafted response)
+  - Final response shown as a formatted email from "AI Support Employee"
+  - Escalation path shown with amber warning styling
+  - "Open in Workflow Builder" button loads the template to canvas
+  - "Try Another" button resets for another demo
+- Updated page.tsx with product-level branding:
+  - Toolbar: "OpenWorkflow AI Employees" with gradient violet-to-cyan logo
+  - Added Headphones (AI Employee Demo) button in toolbar — prominent cyan color
+  - Empty state redesigned: "Meet your AI Support Employee" with gradient CTA button
+  - Primary CTA is now "Watch AI Employee Demo" (gradient cyan-to-violet)
+  - Secondary CTAs: "AI Generate" and "Templates"
+  - Workflow name now shown in toolbar subtitle
+- Updated execution-replay.tsx: Renamed to "AI Employee Activity" with cyan-themed header
+- Updated approval-queue.tsx: Amber-themed header for visibility
+- Removed unused WORKFLOW_TEMPLATES import from page.tsx (demo component handles its own loading)
+
+Build Verification:
+- `npx next build` compiles successfully, all routes generated
+- Dev server running and returning 200
+
+Stage Summary:
+- Week 3 AI Support Employee demo is production-ready
+- The demo walks users through the full email→classify→respond pipeline in real-time
+- Product is now branded as "OpenWorkflow AI Employees" — not just a workflow builder
+- Two demo paths: high confidence (auto-response) and low confidence (escalation)
+- Demo is the #1 CTA on the empty canvas — users see the product value immediately
+- Ready for user demos and Week 4 (get 5 companies)

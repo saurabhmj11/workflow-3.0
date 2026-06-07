@@ -27,12 +27,12 @@ export function ExecutionReplay() {
     return (
       <div className="h-full flex flex-col">
         <div className="p-3 border-b border-zinc-800">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Execution Replay</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-400">AI Employee Activity</h3>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
           <Clock className="h-6 w-6 mb-2 opacity-30" />
-          <p className="text-xs">No executions yet</p>
-          <p className="text-[10px] opacity-60">Click Run to watch the AI work</p>
+          <p className="text-xs">No activity yet</p>
+          <p className="text-[10px] opacity-60">Run a workflow or try the AI Employee Demo</p>
         </div>
       </div>
     )
@@ -42,10 +42,10 @@ export function ExecutionReplay() {
     <div className="h-full flex flex-col">
       <div className="p-3 border-b border-zinc-800">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Execution Replay</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-400">AI Employee Activity</h3>
           {isRunning && (
             <Badge variant="secondary" className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border-blue-500/30">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" /> Running
+              <Loader2 className="h-2.5 w-2.5 animate-spin" /> Working
             </Badge>
           )}
         </div>
@@ -59,7 +59,7 @@ export function ExecutionReplay() {
               key={r.runId}
               onClick={() => setActiveResult(r.runId)}
               className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs ${
-                r.runId === activeResultId ? 'bg-blue-500/10 text-blue-400' : 'hover:bg-zinc-800/50 text-zinc-400'
+                r.runId === activeResultId ? 'bg-cyan-500/10 text-cyan-400' : 'hover:bg-zinc-800/50 text-zinc-400'
               }`}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${
@@ -117,9 +117,9 @@ function StatusBadge({ status }: { status: string }) {
     case 'error':
       return <Badge className="text-[10px] gap-1 bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/10"><X className="h-2.5 w-2.5" /> Error</Badge>
     case 'running':
-      return <Badge className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/10"><Loader2 className="h-2.5 w-2.5 animate-spin" /> Running</Badge>
+      return <Badge className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/10"><Loader2 className="h-2.5 w-2.5 animate-spin" /> Working</Badge>
     case 'awaiting_approval':
-      return <Badge className="text-[10px] gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"><UserCheck className="h-2.5 w-2.5" /> Awaiting Approval</Badge>
+      return <Badge className="text-[10px] gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"><UserCheck className="h-2.5 w-2.5" /> Needs Approval</Badge>
     default:
       return <Badge variant="outline" className="text-[10px]">{status}</Badge>
   }
@@ -167,7 +167,7 @@ function TimelineStep({
       </div>
 
       {/* Step content */}
-      <div className={`flex-1 min-w-0 ${isLast ? '' : ''}`}>
+      <div className="flex-1 min-w-0">
         <button
           onClick={() => setExpanded(!expanded)}
           className="w-full text-left hover:bg-zinc-800/30 rounded-md px-1.5 py-0.5 -mx-1.5 transition-colors"

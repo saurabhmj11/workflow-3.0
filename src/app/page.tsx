@@ -25,6 +25,7 @@ import { executeWorkflow } from '@/lib/engine'
 import { getCategoryForType, type NodeType, type NodeCategory } from '@/lib/types'
 import { TemplateGallery } from '@/components/workflow/template-gallery'
 import { WorkflowGenerator } from '@/components/workflow/workflow-generator'
+import { AIEmployeeDemo } from '@/components/workflow/ai-employee-demo'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -50,7 +51,6 @@ import { VersionHistory } from '@/components/workflow/version-history'
 import { autoLayout } from '@/lib/auto-layout'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { WORKFLOW_TEMPLATES } from '@/lib/templates'
 
 let nodeIdCounter = 0
 
@@ -62,6 +62,7 @@ export default function WorkflowBuilder() {
   const [generatorOpen, setGeneratorOpen] = useState(false)
   const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
 
   const storeNodes = useWorkflowStore((s) => s.nodes)
@@ -372,12 +373,12 @@ export default function WorkflowBuilder() {
       {/* Toolbar */}
       <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-            <Workflow className="h-3.5 w-3.5 text-primary-foreground" />
+          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
+            <Headphones className="h-3.5 w-3.5 text-white" />
           </div>
           <div>
-            <h1 className="text-sm font-bold leading-tight text-zinc-100">OpenWorkflow Builder</h1>
-            <p className="text-[10px] text-zinc-500 font-mono">{nodeCount} nodes · {edgeCount} edges</p>
+            <h1 className="text-sm font-bold leading-tight text-zinc-100">OpenWorkflow <span className="text-cyan-400">AI Employees</span></h1>
+            <p className="text-[10px] text-zinc-500 font-mono">{nodeCount} nodes · {edgeCount} edges · {workflowName}</p>
           </div>
         </div>
 
@@ -389,6 +390,9 @@ export default function WorkflowBuilder() {
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-400 hover:text-cyan-300" onClick={() => setDemoOpen(true)} title="AI Employee Demo">
+            <Headphones className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:text-violet-300" onClick={() => setGeneratorOpen(true)} title="AI Generate">
             <Wand2 className="h-3.5 w-3.5" />
           </Button>
@@ -467,65 +471,35 @@ export default function WorkflowBuilder() {
           {storeNodes.length === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
               <div className="flex flex-col items-center gap-4 text-center pointer-events-auto max-w-md">
-                <div className="h-16 w-16 rounded-2xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-                  <Workflow className="h-8 w-8 text-violet-400" />
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                  <Headphones className="h-8 w-8 text-cyan-400" />
                 </div>
                 <div>
                   <p className="text-base font-semibold text-zinc-200">
-                    Build your first AI workflow
+                    Meet your AI Support Employee
                   </p>
                   <p className="text-sm text-zinc-500 mt-1.5">
-                    Describe it in English, pick a template, or drag nodes from the palette
+                    Watch it classify emails, search your knowledge base, draft responses, and escalate when unsure.
                   </p>
                 </div>
                 <div className="flex flex-col items-center gap-2 w-full">
                   <Button
                     size="sm"
-                    className="h-9 gap-2 bg-violet-600 hover:bg-violet-500 text-white w-full"
-                    onClick={() => setGeneratorOpen(true)}
+                    className="h-10 gap-2 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white w-full shadow-lg shadow-cyan-500/20"
+                    onClick={() => setDemoOpen(true)}
                   >
-                    <Wand2 className="h-4 w-4" />
-                    AI Generate from Description
+                    <Headphones className="h-4 w-4" />
+                    Watch AI Employee Demo
                   </Button>
                   <div className="flex items-center gap-2 w-full">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-9 gap-1.5 border-cyan-500/30 text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/10 hover:border-cyan-500/50 flex-1"
-                      onClick={() => {
-                        // Load AI Support Employee template directly
-                        const template = WORKFLOW_TEMPLATES[0] // aiSupportEmployee is first
-                        if (!template) return
-                        reset()
-                        let counter = 0
-                        const nodeIdMap: string[] = []
-                        for (const node of template.nodes) {
-                          const id = `node-${++counter}-${Date.now()}`
-                          nodeIdMap.push(id)
-                          addNode({
-                            id,
-                            type: node.type,
-                            label: node.label,
-                            category: node.category,
-                            config: { ...node.config },
-                            position: { ...node.position },
-                          })
-                        }
-                        for (const edge of template.edges) {
-                          addEdgeToStore({
-                            id: `edge-${++counter}-${Date.now()}`,
-                            source: nodeIdMap[edge.sourceIndex],
-                            target: nodeIdMap[edge.targetIndex],
-                            sourceHandle: edge.sourceHandle,
-                            targetHandle: edge.targetHandle,
-                          })
-                        }
-                        setName(template.name)
-                        toast({ title: 'AI Support Employee loaded!', description: 'Click Run to test the workflow' })
-                      }}
+                      className="h-9 gap-1.5 border-violet-500/30 text-violet-400 hover:text-violet-200 hover:bg-violet-500/10 hover:border-violet-500/50 flex-1"
+                      onClick={() => setGeneratorOpen(true)}
                     >
-                      <Headphones className="h-3.5 w-3.5" />
-                      AI Support Employee
+                      <Wand2 className="h-3.5 w-3.5" />
+                      AI Generate
                     </Button>
                     <Button
                       size="sm"
@@ -534,7 +508,7 @@ export default function WorkflowBuilder() {
                       onClick={() => setTemplateOpen(true)}
                     >
                       <Lightbulb className="h-3.5 w-3.5" />
-                      All Templates
+                      Templates
                     </Button>
                   </div>
                 </div>
@@ -574,6 +548,9 @@ export default function WorkflowBuilder() {
               maskColor="rgba(0,0,0,0.7)"
             />
           </ReactFlow>
+
+          {/* AI Employee Demo Dialog */}
+          <AIEmployeeDemo open={demoOpen} onOpenChange={setDemoOpen} />
 
           {/* Workflow Generator Dialog */}
           <WorkflowGenerator open={generatorOpen} onOpenChange={setGeneratorOpen} />

@@ -26,7 +26,7 @@ export function ApprovalQueue() {
     <div className="h-full flex flex-col">
       <div className="p-3 border-b border-border/30">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approval Queue</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-400">Approval Queue</h3>
           {pending.length > 0 && (
             <Badge variant="destructive" className="text-[10px]">{pending.length} pending</Badge>
           )}

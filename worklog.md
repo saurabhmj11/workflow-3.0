@@ -354,3 +354,61 @@ Stage Summary:
 - Workflow generator verified working (tested with API call)
 - All builds pass, server runs successfully
 - Ready for user testing and Week 3/4 activities
+
+# OpenWorkflow — Week 2: Advanced Workflow Generator
+
+---
+Task ID: 1
+Agent: Main
+Task: Build production-quality NL→Workflow Generator with preview, refinement, and smart template matching
+
+Work Log:
+- Assessed full codebase: crash is fixed, basic generator exists but needs major upgrade
+- Read all critical files: page.tsx, engine.ts, workflow-store.ts, execution-store.ts, templates.ts, workflow-generator.tsx, generate/route.ts, types.ts, auto-layout.ts, agent-node.tsx
+
+Backend Enhancement (`/api/workflows/generate/route.ts`):
+- Rewrote system prompt with 2 detailed few-shot examples (Customer Support, Lead Qualification)
+- Added 10 explicit rules for workflow generation quality
+- Added refinement mode: accepts `existingWorkflow` + `refinement` to modify workflows with natural language
+- Added retry logic: up to 3 attempts for JSON parsing failures
+- Added robust JSON parsing: handles markdown fences, extracts JSON from surrounding text
+- Added comprehensive validation: fixes missing fields, invalid types, missing trigger nodes, broken edge references
+- Added auto-category detection for email/whatsapp (can be trigger or action)
+
+Frontend Enhancement (`workflow-generator.tsx`):
+- Rebuilt as a 2-step flow: Step 1 (Describe) → Step 2 (Preview & Refine) → Apply to Canvas
+- Added step indicator UI with numbered circles
+- Added workflow preview card showing name, description, stats (nodes, edges, has trigger, AI, HITL)
+- Added mini node preview with category-colored badges for each node
+- Added iterative refinement: textarea + "Refine" button sends modifications to AI
+- Added smart refinement suggestions (e.g., "Add a condition to branch", "Add a human approval step")
+- Added quick suggestion chips for one-click refinement prompts
+- Added auto-layout on apply: generated workflows get dagre layout for clean positioning
+- Added "Regenerate" button to go back and try again
+- Added Ctrl+Enter keyboard shortcut for generation
+- Added "Back" button to return to input step
+
+Smart Template Matching:
+- Added `matchTemplate()` function with keyword-based matching across all 6 templates
+- Matches in real-time as user types (debounced by React)
+- Shows cyan suggestion banner when description matches existing template (>=30% confidence)
+- One-click "Use Template" loads the template instantly (no AI call needed)
+- Keyword dictionaries per template for accurate matching
+
+API Testing:
+- Tested generate endpoint: produces clean 9-node Customer Support workflow
+- Tested different prompt: produces DevOps monitoring workflow with schedule trigger
+- Tested refinement endpoint: successfully modifies existing workflow with natural language
+
+Build Verification:
+- `npx next build` compiles successfully, all routes generated
+- Dev server running and returning 200
+- All API endpoints verified working
+
+Stage Summary:
+- Week 2 Workflow Generator is production-ready
+- 3 modes: Generate from scratch, refine existing, or use matching template
+- Two-step UX with preview before applying to canvas
+- AI produces clean, well-structured workflows with proper node types, configs, and positions
+- Smart template matching saves AI calls and provides instant results
+- Auto-layout ensures generated workflows look clean on the canvas

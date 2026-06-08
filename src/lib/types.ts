@@ -51,7 +51,7 @@ export interface NodeDefinition {
 }
 
 // ─── Edge Definition ─────────────────────────────
-export type SourceHandle = 'default' | 'true' | 'false' | 'error' | 'approved' | 'rejected'
+export type SourceHandle = 'default' | 'true' | 'false' | 'error' | 'approved' | 'rejected' | 'high_confidence' | 'low_confidence'
 export type TargetHandle = 'default' | 'input'
 
 export interface EdgeDefinition {
@@ -159,6 +159,8 @@ export function getSourceHandles(type: NodeType): SourceHandle[] {
   if (type === 'approval') return ['approved', 'rejected']
   if (type === 'review') return ['approved', 'rejected']
   if (type === 'escalation') return ['default', 'error']
+  // AI nodes with confidence routing
+  if (type === 'llm' || type === 'classifier' || type === 'agent') return ['high_confidence', 'low_confidence']
   return ['default']
 }
 

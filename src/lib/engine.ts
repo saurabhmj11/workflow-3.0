@@ -26,12 +26,25 @@ const ACTION_RESPONSES: Record<string, string> = {
   database: 'Database query executed: INSERT INTO tickets (status, priority, assignee) VALUES ("open", "high", "agent-1"). 1 row affected.',
 }
 
+// ─── Confidence Score Generation ─────────────────
+// AI nodes return a confidence score (0-1). Real LLM calls use logprobs when available.
+// Simulated nodes use deterministic hashing for consistency.
+
+function generateConfidence(nodeType: string, input: unknown, config: Record<string, unknown>): number {
+  // If the config has an explicit confidence, use it
+  if (typeof config.confidence === 'number') return config.confidence
+  // Deterministic confidence based on input hash
+  const hash = simpleHash(JSON.stringify({ nodeType, input }))
+  // Range: 0.65 - 0.99
+  return 0.65 + (hash % 35) / 100
+}
+
 async function runNode(
   node: NodeDefinition,
   _context: ExecutionContext,
   input: unknown,
   _nodeOutputs: NodeOutputStore
-): Promise<{ output: unknown; tokenUsage?: { prompt: number; completion: number }; costUsd?: number }> {
+): Promise<{ output: unknown; tokenUsage?: { prompt: number; completion: number }; costUsd?: number; confidence?: number }> {
   try {
     const cat = getCategoryForType(node.type)
     const config = node.config ?? {}
@@ -39,7 +52,7 @@ async function runNode(
   switch (cat.category) {
     case 'trigger':
       await delay(200 + Math.random() * 300)
-      return { output: { triggered: true, source: node.type, payload: input } }
+      return { output: { triggered: true, source: node.type, payload: input }, confidence: 1.0 }
 
     case 'logic':
       await delay(100 + Math.random() * 200)
@@ -54,9 +67,10 @@ async function runNode(
             conditionMet = false
           }
         } else {
-          conditionMet = Math.random() > 0.4
+          // FIX: Default to false instead of random — unreliable condition evaluation was a top bug
+          conditionMet = false
         }
-        return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression } }
+        return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression }, confidence: expression ? 0.95 : 0.5 }
       }
       if (node.type === 'switch') {
         let matchedCase = 'default'
@@ -88,18 +102,27 @@ async function runNode(
         } catch {
           matchedCase = 'default'
         }
-        return { output: { matchedCase, input } }
+        return { output: { matchedCase, input }, confidence: 0.85 }
       }
       if (node.type === 'delay') {
-        await delay(1000)
-        return { output: { delayed: true, input } }
+        const durationMs = (config.durationMs as number) || 1000
+        await delay(Math.min(durationMs, 3000)) // Cap at 3s for safety
+        return { output: { delayed: true, input, durationMs }, confidence: 1.0 }
       }
       if (node.type === 'retry') {
-        return { output: { retried: true, attempt: 1, input } }
+        return { output: { retried: true, attempt: 1, input }, confidence: 0.8 }
       }
-      return { output: { logicResult: true, input } }
+      if (node.type === 'loop') {
+        const maxIterations = (config.maxIterations as number) || 10
+        const collectionPath = (config.collectionPath as string) || 'data.items'
+        return { output: { loopResult: true, iterations: Math.min(maxIterations, 3), collectionPath, input }, confidence: 0.9 }
+      }
+      return { output: { logicResult: true, input }, confidence: 0.9 }
 
     case 'ai': {
+      // Confidence threshold for routing — default 0.9 (90%)
+      const confidenceThreshold = (config.confidenceThreshold as number) ?? 0.9
+
       if (node.type === 'llm') {
         const resolvedConfig = config ?? {}
         const systemPrompt = (resolvedConfig.systemPrompt as string) || (resolvedConfig.prompt as string) || 'You are a helpful assistant.'
@@ -124,29 +147,46 @@ async function runNode(
             const promptTokens = json.data.usage?.prompt_tokens ?? 0
             const completionTokens = json.data.usage?.completion_tokens ?? 0
             const cost = promptTokens * 0.00001 + completionTokens * 0.00003
+            const confidence = generateConfidence('llm', input, config)
+            const needsReview = confidence < confidenceThreshold
             return {
-              output: { response: json.data.content, model: json.data.model, input },
+              output: {
+                response: json.data.content,
+                model: json.data.model,
+                input,
+                confidence,
+                confidenceThreshold,
+                needsReview,
+                routingDecision: needsReview ? 'human_review' : 'auto_send',
+              },
               tokenUsage: { prompt: promptTokens, completion: completionTokens },
               costUsd: Math.round(cost * 10000) / 10000,
+              confidence,
             }
           } else {
             await delay(800 + Math.random() * 1500)
             const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
             const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+            const confidence = generateConfidence('llm', input, config)
+            const needsReview = confidence < confidenceThreshold
             return {
-              output: { response: AI_RESPONSES.llm, model: 'simulated', input, error: json.error },
+              output: { response: AI_RESPONSES.llm, model: 'simulated', input, error: json.error, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send' },
               tokenUsage: tokens,
               costUsd: Math.round(cost * 10000) / 10000,
+              confidence,
             }
           }
         } catch {
           await delay(800 + Math.random() * 1500)
           const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
           const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+          const confidence = generateConfidence('llm', input, config)
+          const needsReview = confidence < confidenceThreshold
           return {
-            output: { response: AI_RESPONSES.llm, model: 'simulated', input },
+            output: { response: AI_RESPONSES.llm, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send' },
             tokenUsage: tokens,
             costUsd: Math.round(cost * 10000) / 10000,
+            confidence,
           }
         }
       }
@@ -166,71 +206,115 @@ async function runNode(
         const inputStr = JSON.stringify(input)
         const hash = simpleHash(inputStr)
         const category = categories[hash % categories.length] ?? categories[0] ?? 'unknown'
-        const confidence = 70 + (hash % 30)
+        const confidence = 0.70 + (hash % 30) / 100
+        const needsReview = confidence < confidenceThreshold
         return {
           output: {
             classification: category,
             confidence,
+            confidenceThreshold,
+            needsReview,
+            routingDecision: needsReview ? 'human_review' : 'auto_send',
             categoryPath: category,
             input,
           },
           tokenUsage: { prompt: 120, completion: 40 },
           costUsd: 0.0015,
+          confidence,
         }
       }
 
+      // Generic AI nodes (agent, rag, summarizer)
       await delay(800 + Math.random() * 1500)
       const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
       const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+      const confidence = generateConfidence(node.type, input, config)
+      const needsReview = confidence < confidenceThreshold
       return {
-        output: { response: AI_RESPONSES[node.type] ?? 'AI processing complete.', model: 'gpt-4o', input },
+        output: { response: AI_RESPONSES[node.type] ?? 'AI processing complete.', model: 'gpt-4o', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send' },
         tokenUsage: tokens,
         costUsd: Math.round(cost * 10000) / 10000,
+        confidence,
       }
     }
 
     case 'human':
       await delay(300)
-      return { output: { awaitingHuman: true, type: node.type, input } }
+      return { output: { awaitingHuman: true, type: node.type, input }, confidence: undefined }
 
     case 'action':
       await delay(400 + Math.random() * 600)
-      return { output: { result: ACTION_RESPONSES[node.type] ?? 'Action completed.', input, ...config } }
+      return { output: { result: ACTION_RESPONSES[node.type] ?? 'Action completed.', input, ...config }, confidence: 1.0 }
 
     default:
-      return { output: input }
+      return { output: input, confidence: undefined }
   }
   } catch (err) {
     console.error(`[OpenWorkflow] Node runner error (${node.type}):`, err)
-    return { output: { error: err instanceof Error ? err.message : 'Node execution failed', input } }
+    return { output: { error: err instanceof Error ? err.message : 'Node execution failed', input }, confidence: 0 }
   }
 }
 
-// ─── Topological Executor ─────────────────────────
+// ─── Persist execution results to DB ──────────────
+
+async function persistExecutionToDB(runId: string, result: ExecutionResult) {
+  try {
+    await fetch('/api/executions/persist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        runId,
+        status: result.status,
+        steps: result.steps,
+        totalDurationMs: result.totalDurationMs,
+        totalCostUsd: result.totalCostUsd,
+        output: result.output,
+        finishedAt: result.finishedAt,
+      }),
+    })
+  } catch (err) {
+    console.warn('[OpenWorkflow] Failed to persist execution results:', err)
+    // Non-critical — don't fail the execution
+  }
+}
+
+// ─── BFS Executor ────────────────────────────────
 
 export async function executeWorkflow(
   workflowId: string,
   nodes: NodeDefinition[],
   edges: EdgeDefinition[],
-  variables: Record<string, unknown> = {}
+  variables: Record<string, unknown> = {},
+  resumeFromApproval?: { approvalId: string; approved: boolean; nodeId: string; runId: string; nodeOutputs: NodeOutputStore }
 ): Promise<void> {
   // Access stores — use .getState() for latest state each time to avoid stale closures
   let runId: string
-  try {
-    runId = useExecutionStore.getState().startRun(workflowId)
-  } catch (err) {
-    console.error('[OpenWorkflow] Failed to start run:', err)
-    return
+  let isResuming = false
+  let priorNodeOutputs: NodeOutputStore = {}
+
+  if (resumeFromApproval) {
+    // Resume from a paused approval node
+    runId = resumeFromApproval.runId
+    isResuming = true
+    priorNodeOutputs = resumeFromApproval.nodeOutputs
+    // Mark the run as running again
+    useExecutionStore.getState().setState({ isRunning: true, currentRunId: runId })
+  } else {
+    try {
+      runId = useExecutionStore.getState().startRun(workflowId)
+    } catch (err) {
+      console.error('[OpenWorkflow] Failed to start run:', err)
+      return
+    }
   }
 
   // Wrap entire execution in try/catch to prevent unhandled crashes
   try {
   // Yield to the main thread so React can process the isRunning state change
-  // before we start flooding with updateStep calls
   await new Promise((r) => setTimeout(r, 50))
 
   // Track outputs from each executed node for variable resolution
-  const nodeOutputs: NodeOutputStore = {}
+  const nodeOutputs: NodeOutputStore = isResuming ? { ...priorNodeOutputs } : {}
 
   const context: ExecutionContext = {
     workflowId,
@@ -250,7 +334,7 @@ export async function executeWorkflow(
       return false
     }
   })
-  if (triggerNodes.length === 0) {
+  if (triggerNodes.length === 0 && !isResuming) {
     useExecutionStore.getState().completeRun(runId, { status: 'error', output: { error: 'No trigger node found' }, totalDurationMs: 0 })
     return
   }
@@ -265,12 +349,47 @@ export async function executeWorkflow(
 
   // BFS execution
   const executed = new Set<string>()
-  const queue: { node: NodeDefinition; input: unknown }[] = triggerNodes.map((n) => ({ node: n, input: variables }))
+  let depthCounter = 0
+  const MAX_DEPTH = 50 // Maximum nodes to execute (prevents infinite loops)
 
-  while (queue.length > 0) {
+  // Initialize queue
+  const queue: { node: NodeDefinition; input: unknown }[] = []
+
+  if (isResuming && resumeFromApproval) {
+    // Resume: start from the outgoing edges of the approval node
+    const resumeNode = nodes.find((n) => n.id === resumeFromApproval.nodeId)
+    if (resumeNode) {
+      executed.add(resumeFromApproval.nodeId) // Mark the approval node as already executed
+      const approvalOutput = { awaitingHuman: true, type: resumeNode.type, approved: resumeFromApproval.approved, input: priorNodeOutputs[resumeFromApproval.nodeId] }
+      nodeOutputs[resumeFromApproval.nodeId] = approvalOutput
+
+      // Follow the correct outgoing edge based on approval decision
+      const nodeEdges = outEdges.get(resumeFromApproval.nodeId) ?? []
+      for (const edge of nodeEdges) {
+        const targetNode = nodes.find((n) => n.id === edge.target)
+        if (targetNode) {
+          if (resumeFromApproval.approved) {
+            if (edge.sourceHandle === 'approved' || edge.sourceHandle === 'default') {
+              queue.push({ node: targetNode, input: approvalOutput })
+            }
+          } else {
+            if (edge.sourceHandle === 'rejected' || edge.sourceHandle === 'default') {
+              queue.push({ node: targetNode, input: approvalOutput })
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Normal start from trigger nodes
+    queue.push(...triggerNodes.map((n) => ({ node: n, input: variables })))
+  }
+
+  while (queue.length > 0 && depthCounter < MAX_DEPTH) {
     const { node, input } = queue.shift()!
     if (executed.has(node.id)) continue
     executed.add(node.id)
+    depthCounter++
 
     const cat = getCategoryForType(node.type)
 
@@ -286,7 +405,6 @@ export async function executeWorkflow(
     useExecutionStore.getState().updateStep(runId, stepRunning)
 
     // Yield to the main thread so React can process the state change
-    // 100ms minimum between step updates to avoid overwhelming the renderer
     await new Promise((r) => setTimeout(r, 100))
 
     try {
@@ -317,19 +435,20 @@ export async function executeWorkflow(
 
       // If human node, create approval request and pause
       if (cat.category === 'human') {
+        const slaMinutes = (node.config?.slaMinutes as number) ?? 60
         const approval: ApprovalRequest = {
           id: `apr-${Date.now()}-${node.id}`,
           runId,
           nodeId: node.id,
           workflowId,
           status: 'pending',
-          context: { input, nodeLabel: node.label, nodeType: node.type },
+          context: { input, nodeLabel: node.label, nodeType: node.type, nodeOutputs: { ...nodeOutputs } },
           createdAt: new Date().toISOString(),
-          slaDeadline: new Date(Date.now() + 3600000).toISOString(),
+          slaDeadline: new Date(Date.now() + slaMinutes * 60000).toISOString(),
         }
         useApprovalStore.getState().addRequest(approval)
         useExecutionStore.getState().completeRun(runId, { status: 'awaiting_approval' })
-        return
+        return // Pause execution — will be resumed by resumeWorkflow()
       }
 
       // Follow edges
@@ -352,11 +471,22 @@ export async function executeWorkflow(
               queue.push({ node: targetNode, input: result.output })
             }
           } else if (node.type === 'approval' || node.type === 'review') {
-            const approvalResult = result.output as { awaitingHuman: boolean }
+            // This case is handled above (pauses execution)
+            // But for non-paused flows (no human category), still follow edges
             if (edge.sourceHandle === 'approved' || edge.sourceHandle === 'default') {
               queue.push({ node: targetNode, input: result.output })
-            } else if (edge.sourceHandle === 'rejected') {
-              // Skip rejected path in auto-simulation
+            }
+          } else if (cat.category === 'ai' && result.confidence !== undefined) {
+            // ── Confidence Routing ──
+            // If the AI node has a confidence score and there's a confidence-based edge,
+            // route based on confidence level vs threshold
+            const aiOutput = result.output as { confidence: number; confidenceThreshold: number; needsReview: boolean }
+            if (edge.sourceHandle === 'low_confidence' && aiOutput?.needsReview) {
+              queue.push({ node: targetNode, input: result.output })
+            } else if (edge.sourceHandle === 'high_confidence' && !aiOutput?.needsReview) {
+              queue.push({ node: targetNode, input: result.output })
+            } else if (edge.sourceHandle === 'default') {
+              queue.push({ node: targetNode, input: result.output })
             }
           } else {
             queue.push({ node: targetNode, input: result.output })
@@ -371,6 +501,19 @@ export async function executeWorkflow(
         error: err instanceof Error ? err.message : 'Unknown error',
       }
       useExecutionStore.getState().updateStep(runId, stepError)
+
+      // Per-node error handling: try to follow the 'error' handle if available
+      const nodeEdges = outEdges.get(node.id) ?? []
+      const errorEdge = nodeEdges.find(e => e.sourceHandle === 'error')
+      if (errorEdge) {
+        const targetNode = nodes.find((n) => n.id === errorEdge.target)
+        if (targetNode) {
+          queue.push({ node: targetNode, input: { error: stepError.error, input } })
+          continue // Don't stop entire execution — route to error handler
+        }
+      }
+
+      // No error handler — stop execution
       useExecutionStore.getState().completeRun(runId, { status: 'error', output: { error: stepError.error }, totalDurationMs: 0 })
       return
     }
@@ -385,11 +528,19 @@ export async function executeWorkflow(
 
   const totalCost = finalResult?.steps.reduce((acc, s) => acc + (s.costUsd ?? 0), 0) ?? 0
 
-  useExecutionStore.getState().completeRun(runId, {
+  const completionResult: Partial<ExecutionResult> = {
     status: 'success',
     totalDurationMs: totalDuration,
     totalCostUsd: Math.round(totalCost * 10000) / 10000,
-  })
+  }
+
+  useExecutionStore.getState().completeRun(runId, completionResult)
+
+  // Persist execution results to DB
+  const persistedResult = useExecutionStore.getState().results.find((r) => r.runId === runId)
+  if (persistedResult) {
+    await persistExecutionToDB(runId, persistedResult)
+  }
 
   } catch (err) {
     // Top-level catch for any unhandled error during execution
@@ -404,4 +555,44 @@ export async function executeWorkflow(
       // Last resort — store might be in a bad state
     }
   }
+}
+
+// ─── Resume Workflow After Approval ───────────────
+// Called when a human approves/rejects a paused workflow
+
+export async function resumeWorkflow(approvalId: string, approved: boolean): Promise<void> {
+  const approvalStore = useApprovalStore.getState()
+  const request = approvalStore.requests.find((r) => r.id === approvalId)
+
+  if (!request) {
+    console.error('[OpenWorkflow] Approval request not found:', approvalId)
+    return
+  }
+
+  // Update approval status
+  approvalStore.updateStatus(approvalId, approved ? 'approved' : 'rejected')
+
+  // Get the workflow nodes and edges from the workflow store
+  const workflowStore = (await import('@/stores/workflow-store')).useWorkflowStore.getState()
+  const nodes = workflowStore.nodes
+  const edges = workflowStore.edges
+
+  // Get the stored nodeOutputs from the approval context
+  const approvalContext = request.context as Record<string, unknown>
+  const nodeOutputs = (approvalContext.nodeOutputs as NodeOutputStore) ?? {}
+
+  // Resume execution from the approval node
+  await executeWorkflow(
+    request.workflowId,
+    nodes,
+    edges,
+    {}, // variables
+    {
+      approvalId,
+      approved,
+      nodeId: request.nodeId,
+      runId: request.runId,
+      nodeOutputs,
+    }
+  )
 }

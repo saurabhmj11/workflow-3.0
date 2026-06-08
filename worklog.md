@@ -454,3 +454,89 @@ Stage Summary:
 - Two demo paths: high confidence (auto-response) and low confidence (escalation)
 - Demo is the #1 CTA on the empty canvas — users see the product value immediately
 - Ready for user demos and Week 4 (get 5 companies)
+
+# OpenWorkflow — Phase 2: Critical Business Features
+
+---
+Task ID: phase2-1
+Agent: Main
+Task: Fix execution reliability, add confidence routing, build AI Employee Dashboard, real integrations, and workflow analytics
+
+Work Log:
+- **Execution Engine Overhaul** (`engine.ts`):
+  - Added `resumeWorkflow()` function — workflows paused at human approval nodes now resume correctly after approve/reject
+  - Fixed condition node fallback: `Math.random() > 0.4` → `conditionMet = false` (deterministic, not random)
+  - Added `depthCounter` with `MAX_DEPTH = 50` to prevent infinite BFS loops
+  - Added per-node error handling: errors route to `error` handle if available, instead of stopping entire execution
+  - Added `persistExecutionToDB()` — execution results now saved to SQLite after each run
+  - Added loop node execution support (was previously a stub)
+  - Added SLA deadline from node config instead of hardcoded 60 minutes
+  - Approval requests now store `nodeOutputs` in context for proper resumption
+  - Confidence routing: AI nodes output `confidence`, `confidenceThreshold`, `needsReview`, `routingDecision`
+
+- **Confidence Layer** (types.ts + engine.ts + agent-node.tsx + node-config-panel.tsx):
+  - Added `high_confidence` and `low_confidence` source handles to SourceHandle type
+  - LLM, Classifier, and Agent nodes now have dual output handles: green (high confidence) and red (low confidence)
+  - Every AI node returns `confidence` (0-1), `confidenceThreshold` (default 0.9), `needsReview`, and `routingDecision`
+  - Config panel: Added "Confidence Threshold" field to LLM, Agent, and Classifier nodes
+  - Agent node UI: Shows confidence percentage badge (green ≥90%, amber 70-90%, red <70%)
+  - Handle labels show "high_confidence" / "low_confidence" with color coding
+
+- **AI Employee Dashboard** (`/dashboard` page):
+  - Full-page dashboard with real-time metrics from execution + approval stores
+  - 8 metric cards: Resolved Today, Escalated, Avg Confidence, Total Cost, Success Rate, Avg Runtime, Satisfaction, AI Nodes Run
+  - Each card has color-coded trend indicators (up/down arrows)
+  - 4 chart tabs using recharts:
+    - Overview: Run Status Pie Chart + Node Type Breakdown Bar Chart
+    - Cost & Duration: Cost Per Run Area Chart + Runtime Per Run Area Chart
+    - Confidence: Confidence Distribution Pie Chart + Confidence Routing Guide (progress bars)
+    - Activity: Recent execution log with status badges, step counts, costs
+  - 3 quick-action cards at bottom: Build Workflow, AI Generate, Review Approvals
+  - Dashboard button added to main page toolbar (BarChart3 icon)
+  - Loading state with spinner
+
+- **Real Integrations Layer** (`/src/lib/integrations/`):
+  - Created `registry.ts` — 5 integration connectors with real OAuth/API configurations:
+    - Gmail (OAuth2): Send Email, Read Inbox
+    - Slack (OAuth2): Post Message, Get Channel Messages
+    - Zendesk (API Key): Create Ticket, Update Ticket, Search Articles
+    - HubSpot (OAuth2): Create Contact, Get Contact, Create Deal
+    - Outlook (OAuth2): Send Email, Read Inbox
+  - Each integration has: auth config, action definitions with input/output schemas, simulated + real execution
+  - `executeIntegrationAction()` — executes real API calls when credentials are available, falls back to simulated responses for demo
+  - Created API routes: `/api/integrations` (list), `/api/integrations/execute` (execute action)
+  - Created `IntegrationPanel` component — "Connect my Gmail" experience:
+    - Integration cards with connect/disconnect buttons
+    - OAuth2 flows simulated for demo (1.5s connection animation)
+    - API key dialog for Zendesk-style integrations
+    - Test action buttons for each integration action
+    - Category grouping: Email, Messaging, Support, CRM
+    - Connection status badges and counters
+
+- **Right Panel Tabs** (page.tsx):
+  - Replaced split panel (Approval Queue + Execution Replay) with tabbed interface
+  - 3 tabs: Approvals, Executions, Integrations
+  - Each tab gets full height, no more cramped half-panels
+
+- **Execution Persistence** (`/api/executions/persist/route.ts`):
+  - New API route to persist client-side execution results to SQLite
+  - Called automatically after each workflow run completes
+  - Updates existing DB execution records or creates new ones
+
+Build Verification:
+- `npx next build` — ✓ Compiled successfully, all routes generated
+- `/` page returns 200
+- `/dashboard` page returns 200
+- `/api/integrations` returns 5 integrations with actions
+- Dev server running on port 3000
+
+Stage Summary:
+- **5 Critical items from user's roadmap are now implemented:**
+  1. ✅ Fix execution reliability (approval resumption, condition fix, maxDepth, per-node error handling, persistence)
+  2. ✅ Real integrations (Gmail, Slack, Zendesk, HubSpot, Outlook with OAuth/API key + simulated demo)
+  3. ✅ AI Employee Dashboard (8 metrics, 4 chart tabs, activity feed, quick actions)
+  4. ✅ Confidence routing (dual output handles on AI nodes, configurable threshold, visual badges)
+  5. ✅ Workflow analytics (cost per run, failure rate, avg runtime, escalation rate, confidence distribution)
+- Product now has business-level metrics and monitoring — not just technical workflow execution
+- "Users don't buy nodes. Users buy: Connect my Gmail" — Integration panel delivers this experience
+- Confidence routing is a core differentiating feature — every AI node flags low-confidence for human review

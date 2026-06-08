@@ -41,6 +41,9 @@ const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {
 
 const FALLBACK_ICON = Zap
 
+// AI node types that support confidence routing
+const CONFIDENCE_NODE_TYPES = new Set(['llm', 'classifier', 'agent'])
+
 function AgentNode({ data, selected, id }: NodeProps) {
   // Guard against missing data during rapid re-renders
   const nodeType = (data?.nodeType as NodeType) ?? 'api'
@@ -49,11 +52,26 @@ function AgentNode({ data, selected, id }: NodeProps) {
   const categoryIcons = ALL_ICONS[cat.category] ?? {}
   const Icon = categoryIcons[nodeType] ?? FALLBACK_ICON
   const handles = getSourceHandles(nodeType)
+  const hasConfidence = CONFIDENCE_NODE_TYPES.has(nodeType)
 
   // Read execution status for this node from the execution store — use the pre-computed stable map
   const nodeStatus: NodeExecutionStatus | null = useExecutionStore((state) => {
     try {
       return state.nodeStatusMap[id] ?? null
+    } catch {
+      return null
+    }
+  })
+
+  // Read the latest execution step for this node to get confidence
+  const confidenceValue: number | null = useExecutionStore((state) => {
+    try {
+      const activeResult = state.results.find(r => r.runId === state.activeResultId)
+      if (!activeResult) return null
+      const step = activeResult.steps.find(s => s.nodeId === id && s.status === 'success')
+      if (!step?.output) return null
+      const output = step.output as { confidence?: number }
+      return output.confidence ?? null
     } catch {
       return null
     }
@@ -142,7 +160,26 @@ function AgentNode({ data, selected, id }: NodeProps) {
       {/* Body */}
       <div className="px-3 py-2.5">
         <p className="text-sm font-medium text-white leading-tight">{label}</p>
-        <p className="text-xs text-zinc-500 mt-0.5 font-mono">{nodeType}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-xs text-zinc-500 font-mono">{nodeType}</p>
+          {/* Confidence badge */}
+          {hasConfidence && confidenceValue !== null && (
+            <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded ${
+              confidenceValue >= 0.9
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : confidenceValue >= 0.7
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}>
+              {(confidenceValue * 100).toFixed(0)}%
+            </span>
+          )}
+          {hasConfidence && confidenceValue === null && (
+            <span className="text-[10px] font-mono text-zinc-600 px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+              conf
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Target handle (top) */}
@@ -164,9 +201,9 @@ function AgentNode({ data, selected, id }: NodeProps) {
             left: `${(i + 1) / (handles.length + 1) * 100}%`,
           }}
           className={`!w-2.5 !h-2.5 !border-2 ${
-            handle === 'true' || handle === 'approved'
+            handle === 'true' || handle === 'approved' || handle === 'high_confidence'
               ? '!bg-emerald-500 !border-emerald-300'
-              : handle === 'false' || handle === 'rejected'
+              : handle === 'false' || handle === 'rejected' || handle === 'low_confidence'
               ? '!bg-red-500 !border-red-300'
               : handle === 'error'
               ? '!bg-amber-500 !border-amber-300'
@@ -182,9 +219,9 @@ function AgentNode({ data, selected, id }: NodeProps) {
             <span
               key={handle}
               className={`text-[9px] font-mono ${
-                handle === 'true' || handle === 'approved'
+                handle === 'true' || handle === 'approved' || handle === 'high_confidence'
                   ? 'text-emerald-400'
-                  : handle === 'false' || handle === 'rejected'
+                  : handle === 'false' || handle === 'rejected' || handle === 'low_confidence'
                   ? 'text-red-400'
                   : 'text-zinc-500'
               }`}

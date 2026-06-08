@@ -23,9 +23,40 @@ import { useWorkflowStore, nodeToFlow } from '@/stores/workflow-store'
 import { useExecutionStore } from '@/stores/execution-store'
 import { executeWorkflow } from '@/lib/engine'
 import { getCategoryForType, type NodeType, type NodeCategory } from '@/lib/types'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+// ─── Right Panel with Tabs ───────────────────────
+function RightPanel() {
+  return (
+    <Tabs defaultValue="approvals" className="h-full flex flex-col">
+      <TabsList className="bg-zinc-900 border-b border-zinc-800 rounded-none h-8 w-full justify-start px-1 gap-0 shrink-0">
+        <TabsTrigger value="approvals" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-amber-400">
+          Approvals
+        </TabsTrigger>
+        <TabsTrigger value="executions" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400">
+          Executions
+        </TabsTrigger>
+        <TabsTrigger value="integrations" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-emerald-400">
+          Integrations
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="approvals" className="flex-1 overflow-hidden m-0">
+        <ApprovalQueue />
+      </TabsContent>
+      <TabsContent value="executions" className="flex-1 overflow-hidden m-0">
+        <ExecutionReplay />
+      </TabsContent>
+      <TabsContent value="integrations" className="flex-1 overflow-hidden m-0">
+        <IntegrationPanel />
+      </TabsContent>
+    </Tabs>
+  )
+}
+
 import { TemplateGallery } from '@/components/workflow/template-gallery'
 import { WorkflowGenerator } from '@/components/workflow/workflow-generator'
 import { AIEmployeeDemo } from '@/components/workflow/ai-employee-demo'
+import { IntegrationPanel } from '@/components/integrations/integration-panel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -44,6 +75,7 @@ import {
   Plug,
   Wand2,
   Headphones,
+  BarChart3,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
@@ -393,6 +425,11 @@ export default function WorkflowBuilder() {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-400 hover:text-cyan-300" onClick={() => setDemoOpen(true)} title="AI Employee Demo">
             <Headphones className="h-3.5 w-3.5" />
           </Button>
+          <a href="/dashboard">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400 hover:text-emerald-300" title="AI Employee Dashboard">
+              <BarChart3 className="h-3.5 w-3.5" />
+            </Button>
+          </a>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:text-violet-300" onClick={() => setGeneratorOpen(true)} title="AI Generate">
             <Wand2 className="h-3.5 w-3.5" />
           </Button>
@@ -578,14 +615,7 @@ export default function WorkflowBuilder() {
           {selectedNodeId ? (
             <NodeConfigPanel />
           ) : (
-            <>
-              <div className="flex-1 overflow-hidden">
-                <ApprovalQueue />
-              </div>
-              <div className="border-t border-zinc-800 flex-1 overflow-hidden">
-                <ExecutionReplay />
-              </div>
-            </>
+            <RightPanel />
           )}
         </div>
       </div>

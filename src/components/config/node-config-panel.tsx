@@ -138,6 +138,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     { key: 'temperature', label: 'Temperature', type: 'number', placeholder: '0.7' },
     { key: 'maxTokens', label: 'Max Tokens', type: 'number', placeholder: '2048' },
     { key: 'systemPrompt', label: 'System Prompt', type: 'textarea', placeholder: 'You are a helpful assistant...' },
+    { key: 'confidenceThreshold', label: 'Confidence Threshold', type: 'number', placeholder: '0.9' },
   ],
   agent: [
     { key: 'model', label: 'Model', type: 'select', options: [
@@ -146,6 +147,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     ] },
     { key: 'tools', label: 'Tools', type: 'tools-tag', placeholder: 'Add a tool...' },
     { key: 'maxIterations', label: 'Max Iterations', type: 'number', placeholder: '10' },
+    { key: 'confidenceThreshold', label: 'Confidence Threshold', type: 'number', placeholder: '0.9' },
   ],
   rag: [
     { key: 'vectorStore', label: 'Vector Store', type: 'select', options: [
@@ -161,6 +163,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
       { value: 'gpt-4o', label: 'GPT-4o' }, { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
       { value: 'claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
     ] },
+    { key: 'confidenceThreshold', label: 'Confidence Threshold', type: 'number', placeholder: '0.9' },
   ],
   summarizer: [
     { key: 'model', label: 'Model', type: 'select', options: [

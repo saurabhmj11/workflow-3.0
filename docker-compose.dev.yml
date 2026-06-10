@@ -1,0 +1,35 @@
+# ─── OpenWorkflow - Development with PostgreSQL ──────────
+# Provides only PostgreSQL so you can run the Next.js app locally
+# with hot reload (bun dev) while using a real database.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d   # Start PostgreSQL
+#   ./scripts/setup-postgres.sh                       # Switch schema + push to DB
+#   bun dev                                           # Start the app locally
+#
+# To stop:
+#   docker compose -f docker-compose.dev.yml down
+#
+# To reset the database:
+#   docker compose -f docker-compose.dev.yml down -v
+# ─────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openworkflow
+      POSTGRES_PASSWORD: openworkflow
+      POSTGRES_DB: openworkflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openworkflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

@@ -6,15 +6,19 @@ import { resumeWorkflow } from '@/lib/engine'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Check, X, Clock, AlertTriangle, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
 
 export function ApprovalQueue() {
   const requests = useApprovalStore((s) => s.requests)
   const updateStatus = useApprovalStore((s) => s.updateStatus)
+  const hydrateFromDB = useApprovalStore((s) => s.hydrateFromDB)
   const results = useExecutionStore((s) => s.results)
   const isRunning = useExecutionStore((s) => s.isRunning)
   const [resumingId, setResumingId] = useState<string | null>(null)
+
+  // Hydrate pending approvals from DB on mount
+  useEffect(() => { hydrateFromDB() }, [hydrateFromDB])
 
   const pending = requests.filter((r) => r.status === 'pending')
   const resolved = requests.filter((r) => r.status !== 'pending')

@@ -3,11 +3,11 @@
 // Both the builder UI and the engine import from here.
 
 // ─── Node Categories ─────────────────────────────
-export const TRIGGER_TYPES = ['api', 'webhook', 'schedule', 'email', 'voice-call', 'whatsapp'] as const
+export const TRIGGER_TYPES = ['api', 'webhook', 'schedule', 'email', 'form', 'voice-call', 'whatsapp', 'subflow'] as const
 export const LOGIC_TYPES = ['condition', 'switch', 'loop', 'retry', 'delay'] as const
 export const AI_TYPES = ['llm', 'agent', 'rag', 'classifier', 'summarizer'] as const
 export const HUMAN_TYPES = ['approval', 'review', 'escalation'] as const
-export const ACTION_TYPES = ['crm', 'email', 'slack', 'whatsapp', 'database'] as const
+export const ACTION_TYPES = ['crm', 'email', 'slack', 'whatsapp', 'database', 'trigger-workflow'] as const
 
 export type TriggerType = (typeof TRIGGER_TYPES)[number]
 export type LogicType = (typeof LOGIC_TYPES)[number]
@@ -161,6 +161,8 @@ export function getSourceHandles(type: NodeType): SourceHandle[] {
   if (type === 'escalation') return ['default', 'error']
   // AI nodes with confidence routing
   if (type === 'llm' || type === 'classifier' || type === 'agent') return ['high_confidence', 'low_confidence']
+  // Trigger-workflow has success + error outputs
+  if (type === 'trigger-workflow') return ['default', 'error']
   return ['default']
 }
 

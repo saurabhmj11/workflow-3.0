@@ -1,9 +1,12 @@
 import { db } from '@/lib/db'
 import { successResponse, errorResponse, serializeWorkflow, parseNodes, parseEdges } from '@/lib/api-utils'
+import { getCurrentUserId } from '@/lib/auth-utils'
+import { auditLog, getRequestMeta, AUDIT_ACTIONS } from '@/lib/audit'
 import type { NodeDefinition, EdgeDefinition } from '@/lib/types'
 
 // ─── GET /api/workflows/[id] ───────────────────────
 // Get a single workflow with its nodes and edges
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function GET(
   request: Request,
@@ -11,6 +14,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
     const workflow = await db.workflow.findUnique({
       where: { id },
@@ -18,6 +22,11 @@ export async function GET(
     })
 
     if (!workflow) {
+      return errorResponse('Workflow not found', 404)
+    }
+
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && workflow.userId && workflow.userId !== userId) {
       return errorResponse('Workflow not found', 404)
     }
 
@@ -30,6 +39,7 @@ export async function GET(
 
 // ─── PUT /api/workflows/[id] ───────────────────────
 // Update a workflow — replaces all nodes and edges in a transaction
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function PUT(
   request: Request,
@@ -37,10 +47,16 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
-    // Check workflow exists
+    // Check workflow exists and belongs to user
     const existing = await db.workflow.findUnique({ where: { id } })
     if (!existing) {
+      return errorResponse('Workflow not found', 404)
+    }
+
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && existing.userId && existing.userId !== userId) {
       return errorResponse('Workflow not found', 404)
     }
 
@@ -87,6 +103,16 @@ export async function PUT(
       return updated
     })
 
+    // Audit log — fire-and-forget
+    auditLog({
+      userId: userId ?? undefined,
+      action: AUDIT_ACTIONS.WORKFLOW_UPDATED,
+      resource: 'workflow',
+      resourceId: id,
+      resourceName: workflow.name,
+      ...getRequestMeta(request),
+    }).catch(() => {})
+
     return successResponse(serializeWorkflow(workflow))
   } catch (err) {
     console.error('[PUT /api/workflows/[id]]', err)
@@ -96,6 +122,7 @@ export async function PUT(
 
 // ─── DELETE /api/workflows/[id] ────────────────────
 // Delete a workflow and cascade
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function DELETE(
   request: Request,
@@ -103,13 +130,29 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
     const existing = await db.workflow.findUnique({ where: { id } })
     if (!existing) {
       return errorResponse('Workflow not found', 404)
     }
 
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && existing.userId && existing.userId !== userId) {
+      return errorResponse('Workflow not found', 404)
+    }
+
     await db.workflow.delete({ where: { id } })
+
+    // Audit log — fire-and-forget
+    auditLog({
+      userId: userId ?? undefined,
+      action: AUDIT_ACTIONS.WORKFLOW_DELETED,
+      resource: 'workflow',
+      resourceId: id,
+      resourceName: existing.name,
+      ...getRequestMeta(request),
+    }).catch(() => {})
 
     return successResponse({ id, deleted: true })
   } catch (err) {

@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import type { ExecutionResult, NodeExecutionStep, NodeExecutionStatus } from '@/lib/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('ExecutionStore')
 
 interface ExecutionState {
   isRunning: boolean
@@ -27,7 +30,7 @@ const activeTimers = new Map<string, ReturnType<typeof setTimeout>>()
 function startSafetyTimer(runId: string) {
   clearSafetyTimer(runId)
   const timer = setTimeout(() => {
-    console.warn(`[OpenWorkflow] Safety timeout: force-resetting run ${runId} after ${MAX_RUN_DURATION_MS}ms`)
+    log.warn({ runId, maxDuration: MAX_RUN_DURATION_MS }, 'Safety timeout: force-resetting run')
     try {
       const store = useExecutionStore.getState()
       if (store.isRunning && store.currentRunId === runId) {
@@ -106,7 +109,7 @@ function flushPendingSteps() {
       nodeStatusMap: buildNodeStatusMap(newResults, prev.activeResultId),
     })
   } catch (err) {
-    console.error('[OpenWorkflow] flushPendingSteps error:', err)
+    log.error({ err }, 'flushPendingSteps error')
   }
 }
 
@@ -169,7 +172,7 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
       pendingSteps.set(runId, step)
       scheduleFlush()
     } catch (err) {
-      console.error('[OpenWorkflow] updateStep error:', err)
+      log.error({ err }, 'updateStep error')
     }
   },
 
@@ -189,7 +192,7 @@ export const useExecutionStore = create<ExecutionState>((set, get) => ({
         nodeStatusMap: buildNodeStatusMap(newResults, s.activeResultId),
       })
     } catch (err) {
-      console.error('[OpenWorkflow] completeRun error:', err)
+      log.error({ err }, 'completeRun error')
       // Force reset isRunning to prevent stuck state
       set({ isRunning: false, currentRunId: null })
     } finally {

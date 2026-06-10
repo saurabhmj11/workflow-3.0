@@ -1,8 +1,10 @@
 import { db } from '@/lib/db'
 import { successResponse, errorResponse } from '@/lib/api-utils'
+import { getCurrentUserId } from '@/lib/auth-utils'
 
 // ─── GET /api/workflows/[id]/versions ──────────────
 // List all versions of a workflow, ordered by version desc
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function GET(
   request: Request,
@@ -10,9 +12,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
     const workflow = await db.workflow.findUnique({ where: { id } })
     if (!workflow) {
+      return errorResponse('Workflow not found', 404)
+    }
+
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && workflow.userId && workflow.userId !== userId) {
       return errorResponse('Workflow not found', 404)
     }
 
@@ -45,6 +53,7 @@ export async function GET(
 
 // ─── POST /api/workflows/[id]/versions ─────────────
 // Create a new version snapshot
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function POST(
   request: Request,
@@ -52,12 +61,18 @@ export async function POST(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
     const workflow = await db.workflow.findUnique({
       where: { id },
       include: { nodes: true, edges: true },
     })
     if (!workflow) {
+      return errorResponse('Workflow not found', 404)
+    }
+
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && workflow.userId && workflow.userId !== userId) {
       return errorResponse('Workflow not found', 404)
     }
 

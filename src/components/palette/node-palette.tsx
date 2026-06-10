@@ -10,18 +10,18 @@ import {
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
-  Search, X,
+  Search, X, PlayCircle, Layers,
 } from 'lucide-react'
 
 function getNodeIcon(type: string, category: NodeCategory): typeof Zap {
   if (type === 'email') return category === 'trigger' ? Mail : Send
   if (type === 'whatsapp') return category === 'trigger' ? MessageSquare : MessageCircle
   const map: Record<string, typeof Zap> = {
-    api: Zap, webhook: Webhook, schedule: Clock, 'voice-call': Phone,
+    api: Zap, webhook: Webhook, schedule: Clock, 'voice-call': Phone, subflow: Layers,
     condition: GitBranch, switch: GitMerge, loop: Repeat, retry: RotateCcw, delay: Timer,
     llm: Brain, agent: Bot, rag: BookOpen, classifier: Tags, summarizer: FileText,
     approval: UserCheck, review: Eye, escalation: AlertTriangle,
-    crm: Database, slack: Hash, database: Plug,
+    crm: Database, slack: Hash, database: Plug, 'trigger-workflow': PlayCircle,
   }
   return map[type] ?? Zap
 }

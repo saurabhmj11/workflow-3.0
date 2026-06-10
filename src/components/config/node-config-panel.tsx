@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, useEffect } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { getCategoryForType, type NodeType } from '@/lib/types'
 import { Input } from '@/components/ui/input'
@@ -26,14 +26,14 @@ import {
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
-  Plus, Wrench,
+  Plus, Wrench, PlayCircle, Layers,
   type LucideIcon,
 } from 'lucide-react'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
 
 // ─── Icon map (mirrors agent-node.tsx) ──────────
 const TRIGGER_ICONS: Record<string, LucideIcon> = {
-  api: Zap, webhook: Webhook, schedule: Clock, email: Mail, 'voice-call': Phone, whatsapp: MessageSquare,
+  api: Zap, webhook: Webhook, schedule: Clock, email: Mail, 'voice-call': Phone, whatsapp: MessageSquare, subflow: Layers,
 }
 const LOGIC_ICONS: Record<string, LucideIcon> = {
   condition: GitBranch, switch: GitMerge, loop: Repeat, retry: RotateCcw, delay: Timer,
@@ -45,14 +45,14 @@ const HUMAN_ICONS: Record<string, LucideIcon> = {
   approval: UserCheck, review: Eye, escalation: AlertTriangle,
 }
 const ACTION_ICONS: Record<string, LucideIcon> = {
-  crm: Database, email: Send, slack: Hash, whatsapp: MessageCircle, database: Plug,
+  crm: Database, email: Send, slack: Hash, whatsapp: MessageCircle, database: Plug, 'trigger-workflow': PlayCircle,
 }
 const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {
   trigger: TRIGGER_ICONS, logic: LOGIC_ICONS, ai: AI_ICONS, human: HUMAN_ICONS, action: ACTION_ICONS,
 }
 
 // ─── Config Schema ──────────────────────────────
-type FieldType = 'text' | 'select' | 'textarea' | 'number' | 'switch' | 'array-string' | 'array-object' | 'tools-tag'
+type FieldType = 'text' | 'select' | 'textarea' | 'number' | 'switch' | 'array-string' | 'array-object' | 'tools-tag' | 'workflow-select'
 
 interface ConfigFieldDef {
   key: string
@@ -94,6 +94,19 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
   whatsapp: [
     { key: 'phoneNumber', label: 'Phone Number', type: 'text', placeholder: '+1-555-0142' },
     { key: 'template', label: 'Template', type: 'text', placeholder: 'hello_template' },
+  ],
+  form: [
+    { key: 'title', label: 'Form Title', type: 'text', placeholder: 'Contact Form' },
+    { key: 'fields', label: 'Form Fields', type: 'array-object', subFields: [
+      { key: 'name', label: 'Field Name', type: 'text', placeholder: 'email' },
+      { key: 'type', label: 'Field Type', type: 'select', options: [
+        { value: 'text', label: 'Text' }, { value: 'email', label: 'Email' }, { value: 'number', label: 'Number' },
+        { value: 'textarea', label: 'Textarea' }, { value: 'select', label: 'Select' }, { value: 'checkbox', label: 'Checkbox' },
+      ] },
+      { key: 'label', label: 'Label', type: 'text', placeholder: 'Your Email' },
+      { key: 'required', label: 'Required', type: 'switch' },
+    ] },
+    { key: 'successMessage', label: 'Success Message', type: 'text', placeholder: 'Thank you for your submission!' },
   ],
 
   // ── Logic ──
@@ -227,6 +240,59 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     { key: 'query', label: 'Query', type: 'textarea', placeholder: 'SELECT * FROM table' },
     { key: 'parameters', label: 'Parameters (JSON)', type: 'textarea', placeholder: '{"id": 1}' },
   ],
+
+  // ── Subflow (Trigger) ──
+  subflow: [
+    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'This workflow is triggered by another workflow...' },
+  ],
+
+  // ── Trigger Workflow (Action) ──
+  'trigger-workflow': [
+    { key: 'targetWorkflowId', label: 'Target Workflow', type: 'workflow-select' },
+    { key: 'waitForCompletion', label: 'Wait for Completion', type: 'switch' },
+    { key: 'passInput', label: 'Pass Input Data', type: 'switch' },
+    { key: 'timeoutMs', label: 'Timeout (ms)', type: 'number', placeholder: '30000' },
+  ],
+}
+
+// ─── Workflow Select Field ──────────────────────────
+// Separate component to properly use React hooks for fetching workflows
+
+function WorkflowSelectField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [workflows, setWorkflows] = useState<{ id: string; name: string }[]>([])
+  const [wfLoading, setWfLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/workflows/list')
+      .then(r => r.json())
+      .then(json => {
+        if (!cancelled && json.ok && Array.isArray(json.data)) {
+          setWorkflows(json.data)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setWfLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  return (
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger className="h-7 text-xs bg-zinc-950 border-zinc-700 text-zinc-200 focus:ring-zinc-600 w-full">
+        <SelectValue placeholder={wfLoading ? 'Loading workflows...' : 'Select a workflow...'} />
+      </SelectTrigger>
+      <SelectContent className="bg-zinc-900 border-zinc-700">
+        {workflows.length === 0 && !wfLoading && (
+          <div className="px-2 py-1.5 text-xs text-zinc-500">No workflows found</div>
+        )}
+        {workflows.map((wf) => (
+          <SelectItem key={wf.id} value={wf.id} className="text-xs text-zinc-200 focus:bg-zinc-800 focus:text-zinc-100">
+            {wf.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 // ─── Field Renderer ─────────────────────────────
@@ -437,6 +503,14 @@ function ConfigField({
         </div>
       )
     }
+
+    case 'workflow-select':
+      return (
+        <WorkflowSelectField
+          value={strVal}
+          onChange={(v) => onChange(field.key, v)}
+        />
+      )
 
     case 'tools-tag': {
       // Parse tools from comma-separated string or array

@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { INTEGRATIONS, type IntegrationConfig, type IntegrationStatus, executeIntegrationAction } from '@/lib/integrations/registry'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Dialog,
@@ -25,6 +24,16 @@ const INTEGRATION_ICONS: Record<string, LucideIcon> = {
   Mail, Hash, Database, Headphones, Plug,
 }
 
+interface StoredCredential {
+  id: string
+  integrationId: string
+  accessToken?: string
+  refreshToken?: string
+  apiKey?: string
+  expiresAt?: string
+  status: string
+}
+
 export function IntegrationPanel() {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationConfig | null>(null)
   const [connectingId, setConnectingId] = useState<string | null>(null)
@@ -32,22 +41,123 @@ export function IntegrationPanel() {
   const [connectionStatuses, setConnectionStatuses] = useState<Record<string, IntegrationStatus>>(
     Object.fromEntries(INTEGRATIONS.map(i => [i.id, 'disconnected']))
   )
+  const [storedCredentials, setStoredCredentials] = useState<Record<string, StoredCredential>>({})
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showConnectDialog, setShowConnectDialog] = useState(false)
 
-  const handleConnect = (integration: IntegrationConfig) => {
+  // ─── Load stored credentials on mount ────────────
+  const loadCredentials = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/credentials')
+      const json = await res.json()
+      if (json.ok && Array.isArray(json.data)) {
+        const creds: Record<string, StoredCredential> = {}
+        const statuses: Record<string, IntegrationStatus> = {}
+
+        for (const cred of json.data) {
+          creds[cred.integrationId] = cred
+          // If credential exists and is active, mark as connected
+          if (cred.status === 'active' && (cred.accessToken || cred.apiKey)) {
+            statuses[cred.integrationId] = 'connected'
+          }
+        }
+
+        setStoredCredentials(creds)
+        setConnectionStatuses(prev => ({
+          ...Object.fromEntries(INTEGRATIONS.map(i => [i.id, 'disconnected'])),
+          ...statuses,
+        }))
+      }
+    } catch (err) {
+      console.warn('[Integrations] Failed to load credentials:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCredentials()
+  }, [loadCredentials])
+
+  // ─── Connect OAuth2 Integration ─────────────────
+  const handleConnect = async (integration: IntegrationConfig) => {
     if (integration.authType === 'oauth2') {
-      // In production, this would redirect to the OAuth URL
-      // For demo, simulate the connection
       setConnectingId(integration.id)
-      setTimeout(() => {
-        setConnectionStatuses(prev => ({ ...prev, [integration.id]: 'connected' }))
-        setConnectingId(null)
-        toast({
-          title: `${integration.name} Connected`,
-          description: `Your ${integration.name} account has been linked successfully.`
+      try {
+        const res = await fetch('/api/integrations/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            integrationId: integration.id,
+            authType: 'oauth2',
+            redirectUri: window.location.origin + '/api/integrations/oauth/callback',
+          }),
         })
-      }, 1500)
+        const json = await res.json()
+
+        if (json.ok && json.data?.authorizationUrl) {
+          // Open OAuth URL in a popup window
+          const width = 600
+          const height = 700
+          const left = window.screenX + (window.outerWidth - width) / 2
+          const top = window.screenY + (window.outerHeight - height) / 2
+          window.open(
+            json.data.authorizationUrl,
+            `${integration.name} Authorization`,
+            `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no`
+          )
+
+          // Poll for credential changes (OAuth callback will save credentials)
+          let pollCount = 0
+          const pollInterval = setInterval(async () => {
+            pollCount++
+            if (pollCount > 60) { // 60 * 2s = 2 minute timeout
+              clearInterval(pollInterval)
+              setConnectingId(null)
+              return
+            }
+
+            try {
+              const credRes = await fetch('/api/integrations/credentials')
+              const credJson = await credRes.json()
+              if (credJson.ok && Array.isArray(credJson.data)) {
+                const newCred = credJson.data.find((c: StoredCredential) => c.integrationId === integration.id)
+                if (newCred && newCred.status === 'active') {
+                  clearInterval(pollInterval)
+                  setConnectionStatuses(prev => ({ ...prev, [integration.id]: 'connected' }))
+                  setStoredCredentials(prev => ({ ...prev, [integration.id]: newCred }))
+                  setConnectingId(null)
+                  toast({
+                    title: `${integration.name} Connected`,
+                    description: `Your ${integration.name} account has been linked successfully via OAuth2.`
+                  })
+                }
+              }
+            } catch {
+              // Continue polling
+            }
+          }, 2000)
+        } else {
+          // Fallback to simulated connection for demo
+          setTimeout(() => {
+            setConnectionStatuses(prev => ({ ...prev, [integration.id]: 'connected' }))
+            setConnectingId(null)
+            toast({
+              title: `${integration.name} Connected (Demo)`,
+              description: `OAuth2 simulation — in production, this redirects to ${integration.name} for authorization.`
+            })
+          }, 1500)
+        }
+      } catch (err) {
+        console.warn('[Integrations] OAuth2 connect failed:', err)
+        // Fallback to simulated
+        setTimeout(() => {
+          setConnectionStatuses(prev => ({ ...prev, [integration.id]: 'connected' }))
+          setConnectingId(null)
+          toast({
+            title: `${integration.name} Connected (Demo)`,
+            description: `Simulated connection — OAuth2 flow not available.`
+          })
+        }, 1500)
+      }
     } else {
       // API key auth — show the connect dialog
       setSelectedIntegration(integration)
@@ -55,32 +165,86 @@ export function IntegrationPanel() {
     }
   }
 
-  const handleApiKeyConnect = () => {
+  // ─── Connect API Key Integration ────────────────
+  const handleApiKeyConnect = async () => {
     if (!selectedIntegration || !apiKeyInput.trim()) return
     setConnectingId(selectedIntegration.id)
-    setTimeout(() => {
-      setConnectionStatuses(prev => ({ ...prev, [selectedIntegration.id]: 'connected' }))
+
+    try {
+      const res = await fetch('/api/integrations/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          integrationId: selectedIntegration.id,
+          authType: 'api_key',
+          apiKey: apiKeyInput.trim(),
+        }),
+      })
+      const json = await res.json()
+
+      if (json.ok) {
+        setConnectionStatuses(prev => ({ ...prev, [selectedIntegration.id]: 'connected' }))
+        // Refresh credentials
+        await loadCredentials()
+        toast({
+          title: `${selectedIntegration.name} Connected`,
+          description: `Your ${selectedIntegration.name} API key has been saved and validated.`
+        })
+      } else {
+        toast({
+          title: 'Connection Failed',
+          description: json.error || 'Failed to save API key',
+          variant: 'destructive'
+        })
+      }
+    } catch (err) {
+      toast({
+        title: 'Connection Error',
+        description: 'Could not connect to the server',
+        variant: 'destructive'
+      })
+    } finally {
       setConnectingId(null)
       setShowConnectDialog(false)
       setApiKeyInput('')
-      toast({
-        title: `${selectedIntegration.name} Connected`,
-        description: `Your ${selectedIntegration.name} API key has been validated.`
-      })
-    }, 1500)
+    }
   }
 
-  const handleDisconnect = (integrationId: string) => {
+  // ─── Disconnect Integration ─────────────────────
+  const handleDisconnect = async (integrationId: string) => {
+    try {
+      await fetch('/api/integrations/credentials', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integrationId }),
+      })
+    } catch {
+      // Non-critical — still update UI
+    }
+
     setConnectionStatuses(prev => ({ ...prev, [integrationId]: 'disconnected' }))
+    setStoredCredentials(prev => {
+      const next = { ...prev }
+      delete next[integrationId]
+      return next
+    })
     toast({
       title: 'Disconnected',
-      description: `Integration has been removed.`
+      description: `Integration credentials have been removed.`
     })
   }
 
+  // ─── Test Integration Action ────────────────────
   const handleTestAction = async (integrationId: string, actionId: string) => {
     setTestingId(actionId)
     try {
+      // Use stored credentials if available
+      const cred = storedCredentials[integrationId]
+      const credentials = cred ? {
+        accessToken: cred.accessToken,
+        apiKey: cred.apiKey,
+      } : undefined
+
       const result = await executeIntegrationAction(integrationId, actionId, {
         to: 'test@example.com',
         subject: 'Test from OpenWorkflow',
@@ -91,9 +255,9 @@ export function IntegrationPanel() {
         subject_ticket: 'Test Ticket',
         description: 'Test ticket from OpenWorkflow',
         priority: 'normal',
-      })
+      }, credentials)
       if (result.ok) {
-        toast({ title: 'Test Successful', description: `Action "${actionId}" executed successfully (simulated)` })
+        toast({ title: 'Test Successful', description: `Action "${actionId}" executed successfully${credentials ? ' (live)' : ' (simulated)'}` })
       } else {
         toast({ title: 'Test Failed', description: result.error, variant: 'destructive' })
       }
@@ -160,6 +324,8 @@ export function IntegrationPanel() {
                   const status = connectionStatuses[integration.id]
                   const isConnected = status === 'connected'
                   const isConnecting = status === 'connecting' || connectingId === integration.id
+                  const cred = storedCredentials[integration.id]
+                  const isLiveCredential = isConnected && cred && (cred.accessToken || cred.apiKey)
 
                   return (
                     <div
@@ -174,7 +340,14 @@ export function IntegrationPanel() {
                             <Icon className={`h-4 w-4 ${isConnected ? 'text-emerald-400' : 'text-zinc-400'}`} />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-zinc-200">{integration.name}</p>
+                            <p className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
+                              {integration.name}
+                              {isLiveCredential && (
+                                <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-emerald-500/30 text-emerald-400">
+                                  LIVE
+                                </Badge>
+                              )}
+                            </p>
                             <p className="text-[10px] text-zinc-600 truncate">{integration.description}</p>
                           </div>
                         </div>
@@ -205,6 +378,20 @@ export function IntegrationPanel() {
                           )}
                         </div>
                       </div>
+
+                      {/* Auth type indicator */}
+                      {!isConnected && (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <span className="text-[9px] text-zinc-600">
+                            {integration.authType === 'oauth2' ? 'OAuth2' : 'API Key'}
+                          </span>
+                          {integration.authType === 'oauth2' && integration.scopes && (
+                            <span className="text-[8px] text-zinc-700">
+                              · {integration.scopes.length} scopes
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Actions list when connected */}
                       {isConnected && (

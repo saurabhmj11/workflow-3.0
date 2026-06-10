@@ -39,6 +39,12 @@ function RightPanel() {
         <TabsTrigger value="integrations" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-emerald-400">
           Integrations
         </TabsTrigger>
+        <TabsTrigger value="memory" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-violet-400">
+          Memory
+        </TabsTrigger>
+        <TabsTrigger value="triggers" className="text-[10px] px-2 h-6 data-[state=active]:bg-zinc-800 data-[state=active]:text-amber-400">
+          Triggers
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="approvals" className="flex-1 overflow-hidden m-0">
         <ApprovalQueue />
@@ -49,6 +55,12 @@ function RightPanel() {
       <TabsContent value="integrations" className="flex-1 overflow-hidden m-0">
         <IntegrationPanel />
       </TabsContent>
+      <TabsContent value="memory" className="flex-1 overflow-hidden m-0">
+        <MemoryPanel />
+      </TabsContent>
+      <TabsContent value="triggers" className="flex-1 overflow-hidden m-0">
+        <TriggerPanel />
+      </TabsContent>
     </Tabs>
   )
 }
@@ -57,6 +69,11 @@ import { TemplateGallery } from '@/components/workflow/template-gallery'
 import { WorkflowGenerator } from '@/components/workflow/workflow-generator'
 import { AIEmployeeDemo } from '@/components/workflow/ai-employee-demo'
 import { IntegrationPanel } from '@/components/integrations/integration-panel'
+import { MemoryPanel } from '@/components/memory/memory-panel'
+import { TriggerPanel } from '@/components/triggers/trigger-panel'
+import { CopilotPanel } from '@/components/copilot/copilot-panel'
+import { MarketplacePanel } from '@/components/marketplace/marketplace-panel'
+import { NotificationPopover } from '@/components/notifications/notification-popover'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -76,6 +93,10 @@ import {
   Wand2,
   Headphones,
   BarChart3,
+  Sparkles,
+  Store,
+  Brain,
+  History,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { LoadWorkflowDialog } from '@/components/workflow/load-workflow-dialog'
@@ -83,6 +104,9 @@ import { VersionHistory } from '@/components/workflow/version-history'
 import { autoLayout } from '@/lib/auto-layout'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { UserNav } from '@/components/auth/user-nav'
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { useOnboarding } from '@/hooks/use-onboarding'
 
 let nodeIdCounter = 0
 
@@ -95,7 +119,11 @@ export default function WorkflowBuilder() {
   const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [demoOpen, setDemoOpen] = useState(false)
+  const [copilotOpen, setCopilotOpen] = useState(false)
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false)
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
+
+  const { showOnboarding, completeOnboarding, resetOnboarding } = useOnboarding()
 
   const storeNodes = useWorkflowStore((s) => s.nodes)
   const storeEdges = useWorkflowStore((s) => s.edges)
@@ -430,8 +458,24 @@ export default function WorkflowBuilder() {
               <BarChart3 className="h-3.5 w-3.5" />
             </Button>
           </a>
+          <a href="/memory">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-pink-400 hover:text-pink-300" title="Agent Memory Layer">
+              <Brain className="h-3.5 w-3.5" />
+            </Button>
+          </a>
+          <a href="/audit">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400 hover:text-emerald-300" title="Audit Trail">
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          </a>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-violet-400 hover:text-violet-300" onClick={() => setGeneratorOpen(true)} title="AI Generate">
             <Wand2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-pink-400 hover:text-pink-300" onClick={() => setCopilotOpen(true)} title="OpenWorkflow Copilot">
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={() => setMarketplaceOpen(true)} title="Marketplace">
+            <Store className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-200" onClick={() => setTemplateOpen(true)} title="Templates">
             <Lightbulb className="h-3.5 w-3.5" />
@@ -494,6 +538,9 @@ export default function WorkflowBuilder() {
               Add a trigger node
             </Badge>
           )}
+          <NotificationPopover />
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <UserNav onResetOnboarding={resetOnboarding} />
         </div>
       </header>
 
@@ -586,11 +633,25 @@ export default function WorkflowBuilder() {
             />
           </ReactFlow>
 
+          {/* Onboarding Wizard */}
+          <OnboardingWizard
+            open={showOnboarding}
+            onOpenChange={(open) => { if (!open) completeOnboarding() }}
+            onComplete={completeOnboarding}
+            onWatchDemo={() => { setDemoOpen(true) }}
+          />
+
           {/* AI Employee Demo Dialog */}
           <AIEmployeeDemo open={demoOpen} onOpenChange={setDemoOpen} />
 
           {/* Workflow Generator Dialog */}
           <WorkflowGenerator open={generatorOpen} onOpenChange={setGeneratorOpen} />
+
+          {/* OpenWorkflow Copilot Dialog */}
+          <CopilotPanel open={copilotOpen} onOpenChange={setCopilotOpen} />
+
+          {/* Marketplace Dialog */}
+          <MarketplacePanel open={marketplaceOpen} onOpenChange={setMarketplaceOpen} />
 
           {/* Template Gallery Dialog */}
           <TemplateGallery open={templateOpen} onOpenChange={setTemplateOpen} />

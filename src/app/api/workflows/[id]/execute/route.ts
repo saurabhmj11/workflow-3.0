@@ -1,9 +1,12 @@
 import { db } from '@/lib/db'
 import { successResponse, errorResponse } from '@/lib/api-utils'
+import { getCurrentUserId } from '@/lib/auth-utils'
+import { auditLog, getRequestMeta, AUDIT_ACTIONS } from '@/lib/audit'
 
 // ─── POST /api/workflows/[id]/execute ──────────────
 // Create an execution record for a workflow (stub)
 // The actual execution happens client-side
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function POST(
   request: Request,
@@ -11,14 +14,20 @@ export async function POST(
 ) {
   try {
     const { id } = await params
+    const userId = await getCurrentUserId()
 
-    // Verify workflow exists
+    // Verify workflow exists and belongs to user
     const workflow = await db.workflow.findUnique({
       where: { id },
       include: { nodes: true },
     })
 
     if (!workflow) {
+      return errorResponse('Workflow not found', 404)
+    }
+
+    // If authenticated, verify the workflow belongs to the user
+    if (userId && workflow.userId && workflow.userId !== userId) {
       return errorResponse('Workflow not found', 404)
     }
 
@@ -52,6 +61,16 @@ export async function POST(
         totalCostUsd: 0,
       },
     })
+
+    // Audit log — fire-and-forget
+    auditLog({
+      userId: userId ?? undefined,
+      action: AUDIT_ACTIONS.WORKFLOW_EXECUTED,
+      resource: 'execution',
+      resourceId: execution.runId,
+      resourceName: workflow.name,
+      ...getRequestMeta(request),
+    }).catch(() => {})
 
     return successResponse({
       runId: execution.runId,

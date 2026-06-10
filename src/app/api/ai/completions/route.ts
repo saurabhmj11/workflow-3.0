@@ -1,9 +1,13 @@
 import ZAI from 'z-ai-web-dev-sdk'
 import { NextResponse } from 'next/server'
+import { withRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AI')
 
 export const maxDuration = 30 // seconds
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const body = await request.json()
     const { messages, model, temperature, maxTokens } = body
@@ -52,7 +56,7 @@ export async function POST(request: Request) {
     } catch (aiError: unknown) {
       // AI SDK errors should not crash the server
       const message = aiError instanceof Error ? aiError.message : 'AI completion failed'
-      console.error('[OpenWorkflow] AI SDK error:', message)
+      log.error({ message }, 'AI SDK error')
       return NextResponse.json(
         { ok: false, error: message },
         { status: 502 }
@@ -61,10 +65,12 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     // Request parsing errors
     const message = error instanceof Error ? error.message : 'Invalid request'
-    console.error('[OpenWorkflow] AI completions route error:', message)
+    log.error({ message }, 'AI completions route error')
     return NextResponse.json(
       { ok: false, error: message },
       { status: 400 }
     )
   }
 }
+
+export const POST = withRateLimit(RATE_LIMITS.ai, handlePost)

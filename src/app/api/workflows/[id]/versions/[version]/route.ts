@@ -1,8 +1,10 @@
 import { db } from '@/lib/db'
 import { successResponse, errorResponse, parseNodes, parseEdges } from '@/lib/api-utils'
+import { getCurrentUserId } from '@/lib/auth-utils'
 
 // ─── GET /api/workflows/[id]/versions/[version] ────
 // Get a specific version's full snapshot
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function GET(
   request: Request,
@@ -11,9 +13,18 @@ export async function GET(
   try {
     const { id, version: versionStr } = await params
     const versionNum = parseInt(versionStr, 10)
+    const userId = await getCurrentUserId()
 
     if (isNaN(versionNum)) {
       return errorResponse('Invalid version number', 400)
+    }
+
+    // Verify workflow belongs to user if authenticated
+    if (userId) {
+      const workflow = await db.workflow.findUnique({ where: { id } })
+      if (!workflow || (workflow.userId && workflow.userId !== userId)) {
+        return errorResponse('Workflow not found', 404)
+      }
     }
 
     const version = await db.workflowVersion.findUnique({
@@ -48,6 +59,7 @@ export async function GET(
 
 // ─── POST /api/workflows/[id]/versions/[version] ───
 // Restore/rollback to this version — replaces current workflow nodes/edges with the snapshot
+// Scoped to current user if authenticated (multi-tenancy)
 
 export async function POST(
   request: Request,
@@ -56,9 +68,18 @@ export async function POST(
   try {
     const { id, version: versionStr } = await params
     const versionNum = parseInt(versionStr, 10)
+    const userId = await getCurrentUserId()
 
     if (isNaN(versionNum)) {
       return errorResponse('Invalid version number', 400)
+    }
+
+    // Verify workflow belongs to user if authenticated
+    if (userId) {
+      const workflow = await db.workflow.findUnique({ where: { id } })
+      if (!workflow || (workflow.userId && workflow.userId !== userId)) {
+        return errorResponse('Workflow not found', 404)
+      }
     }
 
     const version = await db.workflowVersion.findUnique({

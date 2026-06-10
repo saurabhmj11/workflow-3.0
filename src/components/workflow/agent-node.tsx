@@ -10,13 +10,13 @@ import {
   Brain, Bot, BookOpen, Tags, FileText,
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
-  Loader2, Check, X,
+  Loader2, Check, X, PlayCircle, Layers,
   type LucideIcon,
 } from 'lucide-react'
 
 // Map with unique keys to avoid duplicate key issue for email/whatsapp
 const TRIGGER_ICONS: Record<string, LucideIcon> = {
-  api: Zap, webhook: Webhook, schedule: Clock, email: Mail, 'voice-call': Phone, whatsapp: MessageSquare,
+  api: Zap, webhook: Webhook, schedule: Clock, email: Mail, 'voice-call': Phone, whatsapp: MessageSquare, subflow: Layers,
 }
 const LOGIC_ICONS: Record<string, LucideIcon> = {
   condition: GitBranch, switch: GitMerge, loop: Repeat, retry: RotateCcw, delay: Timer,
@@ -28,7 +28,7 @@ const HUMAN_ICONS: Record<string, LucideIcon> = {
   approval: UserCheck, review: Eye, escalation: AlertTriangle,
 }
 const ACTION_ICONS: Record<string, LucideIcon> = {
-  crm: Database, email: Send, slack: Hash, whatsapp: MessageCircle, database: Plug,
+  crm: Database, email: Send, slack: Hash, whatsapp: MessageCircle, database: Plug, 'trigger-workflow': PlayCircle,
 }
 
 const ALL_ICONS: Record<string, Record<string, LucideIcon>> = {

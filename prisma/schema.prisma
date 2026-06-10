@@ -1,5 +1,26 @@
 // ─── OpenWorkflow Prisma Schema ────────────────────
 // AI Workflow Operating System persistence layer
+//
+// ─── Switching Database Provider ──────────────────
+// This schema works with both SQLite and PostgreSQL.
+// No SQLite-specific features are used, so switching is seamless.
+//
+// To switch to PostgreSQL:
+//   Option A: Run the switcher script
+//     ./scripts/db-switch.sh postgresql
+//
+//   Option B: Manual steps
+//     1. Change provider below: "sqlite" → "postgresql"
+//     2. Update .env: DATABASE_URL="postgresql://user:password@localhost:5432/openworkflow?schema=public"
+//     3. Run: npx prisma generate && npx prisma db push
+//
+// To switch back to SQLite:
+//   ./scripts/db-switch.sh sqlite
+//
+// For Docker-based PostgreSQL:
+//   docker compose -f docker-compose.dev.yml up -d
+//   ./scripts/setup-postgres.sh
+// ────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client-js"
@@ -10,6 +31,64 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── NextAuth.js v5 Models ──────────────────────────
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  hashedPassword String?
+  image          String?
+  role           String   @default("USER") // ADMIN, USER, VIEWER
+  emailVerified  DateTime?
+  accounts       Account[]
+  sessions       Session[]
+  workflows      Workflow[]
+  customerProfiles CustomerProfile[]
+  metadata       String?  // JSON: organization settings, notification preferences, etc.
+  integrationCredentials IntegrationCredential[]
+  notifications    Notification[]
+  apiKeys        ApiKey[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Workflow Models ────────────────────────────────
+
 model Workflow {
   id          String   @id @default(cuid())
   name        String   @default("Untitled Workflow")
@@ -17,10 +96,15 @@ model Workflow {
   version     Int      @default(1)
   isActive    Boolean  @default(false)
   metadata    String?  // JSON string
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   nodes       XmlNode[]
   edges       Edge[]
   executions  Execution[]
   versions    WorkflowVersion[]
+  webhookTriggers   WebhookTrigger[]
+  scheduleTriggers  ScheduleTrigger[]
+  emailTriggers     EmailTrigger[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -107,4 +191,253 @@ model WorkflowVersion {
   workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@unique([workflowId, version])
+}
+
+// ─── Agent Memory Layer ──────────────────────────
+// Stores customer context, interaction history, and sentiment data
+// so AI employees can reference past interactions
+
+model CustomerProfile {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  company       String?
+  tier          String   @default("free") // free, starter, pro, enterprise
+  avatarUrl     String?
+  metadata      String?  // JSON: arbitrary customer data (purchase history, preferences, etc.)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  interactions  Interaction[]
+  sentimentLogs SentimentLog[]
+  memoryNotes   MemoryNote[]
+}
+
+model Interaction {
+  id           String   @id @default(cuid())
+  customerId   String
+  type         String   // email, chat, ticket, call, webhook
+  subject      String?
+  content      String   // The body/content of the interaction
+  summary      String?  // AI-generated summary
+  sentiment    String?  // positive, negative, neutral, mixed
+  confidence   Float?   // AI confidence in the classification
+  status       String   @default("new") // new, in_progress, resolved, escalated, closed
+  priority     String   @default("normal") // low, normal, high, critical
+  assignee     String?  // Who/what handled this (AI agent name or human)
+  resolution   String?  // How it was resolved
+  tags         String?  // JSON array of tags
+  metadata     String?  // JSON: additional data (ticket ID, channel, etc.)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  resolvedAt   DateTime?
+
+  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model SentimentLog {
+  id          String   @id @default(cuid())
+  customerId  String
+  source      String   // interaction_id, manual, batch_analysis
+  sentiment   String   // positive, negative, neutral, mixed
+  score       Float    // -1.0 to 1.0
+  confidence  Float    // 0 to 1.0
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ─── Memory Notes & Knowledge Extraction ────────
+// AI-extracted facts, preferences, and insights about customers
+// These are short, structured notes that the AI employee "remembers"
+
+model MemoryNote {
+  id          String   @id @default(cuid())
+  customerId  String
+  category    String   // preference, fact, insight, warning, commitment
+  content     String   // The extracted knowledge (e.g., "Prefers email over phone")
+  source      String   @default("ai_extraction") // ai_extraction, manual, interaction
+  sourceId    String?  // ID of the originating interaction or extraction run
+  confidence  Float    @default(1.0) // 0-1, how confident we are in this note
+  isActive    Boolean  @default(true) // Soft-delete / supersede
+  tags        String?  // JSON array of tags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ─── Customer Segments ──────────────────────────
+// Group customers by behavior, tier, sentiment, etc.
+
+model CustomerSegment {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   @default("auto") // auto, manual
+  rules       String   // JSON: segment rules/filters (e.g., {"tier": "enterprise", "minInteractions": 5})
+  color       String?  // UI color for the segment badge
+  memberCount Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Approval Persistence ────────────────────────
+// Persists approval requests so they survive page refresh
+
+model ApprovalRecord {
+  id           String    @id @default(cuid())
+  runId        String
+  nodeId       String
+  workflowId   String
+  status       String    @default("pending") // pending, approved, rejected, expired
+  assignee     String?
+  context      String    // JSON: input, nodeLabel, nodeType, nodeOutputs
+  notes        String?
+  slaDeadline  DateTime?
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+}
+
+// ─── Integration Credentials ─────────────────────
+// Stores OAuth tokens and API keys for connected integrations
+
+model IntegrationCredential {
+  id             String   @id @default(cuid())
+  integrationId  String   // gmail, slack, zendesk, hubspot, outlook
+  accessToken    String?
+  refreshToken   String?
+  apiKey         String?
+  expiresAt      DateTime?
+  metadata       String?  // JSON: scopes, account info, etc.
+  status         String   @default("active") // active, expired, revoked
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([integrationId])
+}
+
+// ─── Real-Time Triggers ─────────────────────────
+// Webhook, Schedule, and Email trigger infrastructure
+
+model WebhookTrigger {
+  id           String   @id @default(cuid())
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  triggerId    String   @unique  // Unique ID used in the webhook URL
+  secret       String?            // Optional HMAC secret for signature verification
+  description  String?
+  isActive     Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ScheduleTrigger {
+  id             String   @id @default(cuid())
+  workflowId     String
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  cronExpression String            // e.g., "*/5 * * * *"
+  timezone       String   @default("UTC")
+  isActive       Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model EmailTrigger {
+  id           String   @id @default(cuid())
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  host         String            // IMAP server host
+  port         Int      @default(993)
+  username     String            // Email address
+  password     String            // App password (encrypted at rest)
+  mailbox      String   @default("INBOX")
+  pollInterval Int      @default(30)  // seconds
+  isActive     Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TriggerLog {
+  id          String   @id @default(cuid())
+  triggerType String   // webhook, schedule, email
+  triggerId   String   // Reference to the specific trigger
+  workflowId  String
+  payload     String   // JSON string of the trigger payload
+  status      String   // success, error
+  error       String?
+  duration    Int?     // Processing time in ms
+  createdAt   DateTime @default(now())
+}
+
+// ─── Audit Trail ──────────────────────────────────
+// Tracks all significant actions across the platform
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  userEmail    String?
+  action       String   // workflow.created, workflow.updated, workflow.deleted, workflow.executed, approval.approved, approval.rejected, integration.connected, integration.disconnected, user.login, user.registered, trigger.created, trigger.deleted, api_key.created, api_key.revoked
+  resource     String   // workflow, execution, approval, integration, trigger, user, api_key
+  resourceId   String?
+  resourceName String?
+  status       String   @default("success") // success, failure
+  ipAddress    String?
+  userAgent    String?
+  details      String?  // JSON: additional context
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([resource, resourceId])
+}
+
+// ─── Notification Center ─────────────────────────
+// Stores in-app notifications for users
+// Supports categories: execution, approval, trigger, integration, system
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String    // execution_complete, approval_needed, trigger_fired, integration_connected, error_alert, info
+  title       String
+  message     String
+  category    String    // execution, approval, trigger, integration, system
+  priority    String    @default("normal") // low, normal, high, critical
+  isRead      Boolean   @default(false)
+  actionUrl   String?   // URL to navigate to when clicked
+  metadata    String?   // JSON: additional data (runId, workflowId, etc.)
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+// ─── API Keys ──────────────────────────────────────
+// API keys for programmatic access to the OpenWorkflow API
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  keyHash     String    // SHA-256 hash of the key
+  keyPrefix   String    // First 8 chars for display (e.g., "owf_1a2b")
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([keyPrefix])
 }

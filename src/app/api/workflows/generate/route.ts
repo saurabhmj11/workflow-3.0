@@ -1,5 +1,6 @@
 import ZAI from 'z-ai-web-dev-sdk'
 import { NextResponse } from 'next/server'
+import { withRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 // ─── System Prompt with Few-Shot Examples ─────────
 const SYSTEM_PROMPT = `You are an expert AI workflow architect for OpenWorkflow, an AI Workflow Operating System.
@@ -270,7 +271,7 @@ function parseAIResponse(content: string): Record<string, unknown> | null {
 
 // ─── POST Handler ─────────────────────────────────
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const body = await request.json()
     const { description, existingWorkflow, refinement } = body as {
@@ -359,3 +360,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
+export const POST = withRateLimit(RATE_LIMITS.generate, handlePost)

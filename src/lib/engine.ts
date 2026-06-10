@@ -5,6 +5,7 @@ import { useApprovalStore } from '@/stores/approval-store'
 import { resolveVariables, evaluateSimpleCondition, simpleHash, getNestedValue, type NodeOutputStore, type ResolutionContext } from '@/lib/variable-resolver'
 import { memoryStore, type CustomerContext } from '@/lib/memory/store'
 import { createLogger } from '@/lib/logger'
+import { agentOrchestrator, type OrchestrationPattern, type AgentDefinition } from '@/lib/agent-orchestrator'
 
 const log = createLogger('Engine')
 
@@ -208,6 +209,12 @@ async function runNode(
         await delay(200 + Math.random() * 300)
         if (node.type === 'subflow') {
           return { output: { triggered: true, source: 'subflow', payload: input, parentRunId: _context.parentRunId }, confidence: 1.0 }
+        }
+        if (node.type === 'voice-call') {
+          return { output: { triggered: true, source: 'voice-call', payload: input, callData: input, provider: config.provider || 'twilio' }, confidence: 1.0 }
+        }
+        if (node.type === 'whatsapp') {
+          return { output: { triggered: true, source: 'whatsapp', payload: input, messageData: input, provider: config.provider || 'meta' }, confidence: 1.0 }
         }
         return { output: { triggered: true, source: node.type, payload: input }, confidence: 1.0 }
 
@@ -655,6 +662,66 @@ Where:
 
         // ─── Agent Node — Real AI with Tool Use ───
         if (node.type === 'agent') {
+          // ─── Multi-Agent Orchestration ────
+          // When config.orchestration is set, use AgentOrchestrator
+          // instead of single-agent execution
+          const orchestrationConfig = config.orchestration as {
+            enabled?: boolean
+            pattern?: OrchestrationPattern
+            agents?: AgentDefinition[]
+            maxRounds?: number
+          } | undefined
+
+          if (orchestrationConfig?.enabled && orchestrationConfig.agents && orchestrationConfig.agents.length > 0) {
+            const pattern = orchestrationConfig.pattern || 'sequential'
+            const task = typeof input === 'string' ? input : JSON.stringify(input)
+
+            try {
+              const session = agentOrchestrator.createSession(
+                orchestrationConfig.agents,
+                pattern,
+                { maxRounds: orchestrationConfig.maxRounds ?? 2 }
+              )
+
+              const result = await agentOrchestrator.runOrchestration(session.id, task)
+
+              const orchestrationOutput = {
+                response: result.result
+                  ? (result.result as Record<string, unknown>).finalOutput ?? JSON.stringify(result.result)
+                  : 'Orchestration completed with no output',
+                model: `orchestrated:${pattern}`,
+                input,
+                confidence: 0.85,
+                confidenceThreshold,
+                needsReview: false,
+                routingDecision: 'auto_send' as const,
+                orchestration: {
+                  pattern,
+                  sessionId: result.id,
+                  rounds: result.currentRound,
+                  agentCount: result.agents.length,
+                  messageCount: result.messages.length,
+                  status: result.status,
+                  allResults: result.result
+                    ? (result.result as Record<string, unknown>).allResults
+                    : undefined,
+                },
+                memoryUsed: !!memoryPrompt,
+                customerEmail: customerEmail || undefined,
+              }
+
+              return {
+                output: orchestrationOutput,
+                tokenUsage: { prompt: orchestrationConfig.agents.length * 100, completion: orchestrationConfig.agents.length * 80 },
+                costUsd: Math.round(orchestrationConfig.agents.length * 0.002 * 10000) / 10000,
+                confidence: 0.85,
+              }
+            } catch (orchErr) {
+              log.warn({ err: orchErr }, 'Multi-agent orchestration failed, falling back to single agent')
+              // Fall through to single-agent execution below
+            }
+          }
+
           let agentSystemPrompt = (config.systemPrompt as string) || 'You are an AI agent. Analyze the task, reason through the steps, and provide a comprehensive response.'
 
           if (memoryPrompt) {

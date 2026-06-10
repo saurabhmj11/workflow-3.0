@@ -102,10 +102,13 @@ model Workflow {
   edges       Edge[]
   executions  Execution[]
   versions    WorkflowVersion[]
+  deployments Deployment[]
   webhookTriggers   WebhookTrigger[]
   scheduleTriggers  ScheduleTrigger[]
   emailTriggers     EmailTrigger[]
   formTriggers      FormTrigger[]
+  voiceCallTriggers VoiceCallTrigger[]
+  whatsAppTriggers  WhatsAppTrigger[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -387,6 +390,46 @@ model FormTrigger {
   updatedAt       DateTime  @updatedAt
 }
 
+// ─── Voice Call Trigger ──────────────────────────
+// Twilio / Vonage voice call triggers that accept inbound calls
+
+model VoiceCallTrigger {
+  id              String    @id @default(cuid())
+  triggerId       String    @unique @default(cuid())
+  name            String
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  provider        String    @default("twilio") // twilio, vonage, etc.
+  phoneNumber     String?   // The phone number to receive calls on
+  webhookUrl      String?   // The URL for the voice provider to call
+  welcomeMessage  String?   // TTS message to play when call connects
+  recordCall      Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── WhatsApp Trigger ────────────────────────────
+// Meta / Twilio / 360dialog WhatsApp message triggers
+
+model WhatsAppTrigger {
+  id              String    @id @default(cuid())
+  triggerId       String    @unique @default(cuid())
+  name            String
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  provider        String    @default("meta") // meta, twilio, 360dialog
+  phoneNumberId   String?   // Meta WhatsApp Business phone number ID
+  webhookVerifyToken String? // Token for webhook verification
+  isActive        Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model TriggerLog {
   id          String   @id @default(cuid())
   triggerType String   // webhook, schedule, email, form
@@ -468,6 +511,83 @@ model RateLimitEntry {
   key       String   @unique
   count     Int      @default(0)
   resetTime DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Deployment Environments & Deployments ────────
+// Manages workflow promotion between dev/staging/production
+// with version tracking and rollback support
+
+model DeploymentEnvironment {
+  id          String   @id @default(cuid())
+  name        String   // dev, staging, production
+  slug        String   @unique // dev, staging, production
+  description String?
+  color       String   @default("#6B7280") // UI color
+  isDefault   Boolean  @default(false)
+  requiresApproval Boolean @default(false) // Promotion to this env requires approval
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deployments Deployment[]
+}
+
+model Deployment {
+  id              String   @id @default(cuid())
+  workflowId      String
+  workflow        Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  environmentId   String
+  environment     DeploymentEnvironment @relation(fields: [environmentId], references: [id])
+  version         Int      // Snapshot version deployed
+  snapshotId      String?  // Reference to WorkflowVersion snapshot
+  status          String   @default("deployed") // deployed, promoting, rolled_back, failed
+  deployedBy      String?  // userId
+  deployedAt      DateTime @default(now())
+  promotedFrom    String?  // Previous environment deployment ID
+  rollbackData    String?  // JSON: previous deployment snapshot for rollback
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── SSO / SAML Configuration ────────────────────
+// Manages SAML and OIDC identity provider configurations
+// for enterprise single sign-on authentication
+
+model SSOConfiguration {
+  id              String   @id @default(cuid())
+  name            String
+  provider        String   // saml, oidc, okta, azure-ad, google-workspace
+  enabled         Boolean  @default(false)
+
+  // SAML-specific
+  samlEntryPoint  String?  // Identity Provider SSO URL
+  samlCertificate String?  // IDP certificate (x509)
+  samlIssuer      String?  // Entity ID
+
+  // OIDC-specific
+  oidcDiscoveryUrl String? // .well-known/openid-configuration
+  oidcClientId     String?
+  oidcClientSecret String?
+
+  // Domain restriction
+  allowedDomains   String?  // JSON array: ["company.com"]
+
+  // Auto-provisioning
+  autoProvision    Boolean  @default(true)
+  defaultRole      String   @default("USER")
+
+  metadata         String?  // JSON: additional provider-specific config
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── Site Configuration ──────────────────────────
+// Key-value store for platform-wide settings (white-label config, embed tokens, etc.)
+
+model SiteConfig {
+  key       String   @id  // e.g., "whitelabel", "embed_token:abc123"
+  value     String   // JSON string of the configuration
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

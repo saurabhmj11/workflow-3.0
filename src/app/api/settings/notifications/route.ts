@@ -9,6 +9,7 @@ interface NotificationPreferences {
   executionAlerts: boolean
   approvalAlerts: boolean
   triggerFailureAlerts: boolean
+  formSubmissionAlerts: boolean
   weeklyDigest: boolean
 }
 
@@ -18,7 +19,13 @@ const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
   executionAlerts: true,
   approvalAlerts: true,
   triggerFailureAlerts: true,
+  formSubmissionAlerts: true,
   weeklyDigest: false,
+}
+
+// Check if SMTP is configured
+function isSmtpConfigured(): boolean {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
 }
 
 // GET /api/settings/notifications — Get notification preferences
@@ -45,10 +52,13 @@ export async function GET() {
 
     const notifications: NotificationPreferences = {
       ...DEFAULT_NOTIFICATIONS,
-      ...(metadata.notifications as NotificationPreferences | undefined),
+      ...(metadata.notifications as Partial<NotificationPreferences> | undefined),
     }
 
-    return successResponse(notifications)
+    return successResponse({
+      ...notifications,
+      smtpConfigured: isSmtpConfigured(),
+    })
   } catch (err) {
     console.error('[Settings/Notifications] GET error:', err)
     return errorResponse('Failed to fetch notification preferences', 500)
@@ -79,7 +89,7 @@ export async function PUT(req: NextRequest) {
     // Merge notification preferences
     const currentNotifications: NotificationPreferences = {
       ...DEFAULT_NOTIFICATIONS,
-      ...(metadata.notifications as NotificationPreferences | undefined),
+      ...(metadata.notifications as Partial<NotificationPreferences> | undefined),
     }
 
     const updatedNotifications: NotificationPreferences = {
@@ -88,6 +98,7 @@ export async function PUT(req: NextRequest) {
       executionAlerts: body.executionAlerts ?? currentNotifications.executionAlerts,
       approvalAlerts: body.approvalAlerts ?? currentNotifications.approvalAlerts,
       triggerFailureAlerts: body.triggerFailureAlerts ?? currentNotifications.triggerFailureAlerts,
+      formSubmissionAlerts: body.formSubmissionAlerts ?? currentNotifications.formSubmissionAlerts,
       weeklyDigest: body.weeklyDigest ?? currentNotifications.weeklyDigest,
     }
 
@@ -98,7 +109,10 @@ export async function PUT(req: NextRequest) {
       data: { metadata: JSON.stringify(metadata) },
     })
 
-    return successResponse(updatedNotifications)
+    return successResponse({
+      ...updatedNotifications,
+      smtpConfigured: isSmtpConfigured(),
+    })
   } catch (err) {
     if (err instanceof Error && err.name === 'AuthRequiredError') {
       return errorResponse('Authentication required', 401)

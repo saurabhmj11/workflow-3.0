@@ -35,19 +35,25 @@ function createLevelFn(level: string, bindings: Record<string, unknown>, console
   return logFn
 }
 
-function createLogger(bindings: Record<string, unknown> = {}): Logger {
+function createLoggerInternal(bindings: Record<string, unknown> = {}): Logger {
   return {
     info: createLevelFn('info', bindings, console.info),
     warn: createLevelFn('warn', bindings, console.warn),
     error: createLevelFn('error', bindings, console.error),
     debug: createLevelFn('debug', bindings, console.debug),
-    child: (newBindings: Record<string, unknown>) => createLogger({ ...bindings, ...newBindings }),
+    child: (newBindings: Record<string, unknown>) => createLoggerInternal({ ...bindings, ...newBindings }),
   }
 }
 
-const logger = createLogger({ env: typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined })
+const logger = createLoggerInternal({ env: typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined })
 
 export default logger
 
-// Convenience methods with component prefix
-export { createLogger }
+// Convenience method with component prefix
+// Accepts either a string (component name) or a Record (pino-style bindings)
+export function createLogger(componentOrBindings: string | Record<string, unknown>): Logger {
+  if (typeof componentOrBindings === 'string') {
+    return logger.child({ component: componentOrBindings })
+  }
+  return logger.child(componentOrBindings)
+}

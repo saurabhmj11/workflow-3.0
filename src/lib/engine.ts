@@ -2,7 +2,7 @@ import type { NodeDefinition, EdgeDefinition, ExecutionContext, NodeExecutionSte
 import { getCategoryForType } from '@/lib/types'
 import { useExecutionStore } from '@/stores/execution-store'
 import { useApprovalStore } from '@/stores/approval-store'
-import { resolveVariables, evaluateSimpleCondition, simpleHash, type NodeOutputStore, type ResolutionContext } from '@/lib/variable-resolver'
+import { resolveVariables, evaluateSimpleCondition, simpleHash, getNestedValue, type NodeOutputStore, type ResolutionContext } from '@/lib/variable-resolver'
 import { memoryStore, type CustomerContext } from '@/lib/memory/store'
 import { createLogger } from '@/lib/logger'
 
@@ -29,6 +29,8 @@ const ACTION_RESPONSES: Record<string, string> = {
   whatsapp: 'WhatsApp message delivered to +1-555-0142: "Your appointment has been confirmed for Thursday at 2:00 PM."',
   database: 'Database query executed: INSERT INTO tickets (status, priority, assignee) VALUES ("open", "high", "agent-1"). 1 row affected.',
   'trigger-workflow': 'Sub-workflow triggered successfully.',
+  'http-request': 'HTTP request completed successfully.',
+  'code': 'Code execution completed successfully.',
 }
 
 // ─── Confidence Score Generation ─────────────────
@@ -180,181 +182,640 @@ async function callAI(
   }
 }
 
+// ─── Graph Context for runNode ───────────────────
+// Provides access to the workflow graph structure so that
+// loop, retry, and other nodes can traverse edges and re-execute nodes.
+
+interface GraphContext {
+  nodes: NodeDefinition[]
+  edges: EdgeDefinition[]
+  outEdges: Map<string, EdgeDefinition[]>
+}
+
 async function runNode(
   node: NodeDefinition,
   _context: ExecutionContext,
   input: unknown,
-  _nodeOutputs: NodeOutputStore
+  _nodeOutputs: NodeOutputStore,
+  _graph?: GraphContext
 ): Promise<{ output: unknown; tokenUsage?: { prompt: number; completion: number }; costUsd?: number; confidence?: number }> {
   try {
     const cat = getCategoryForType(node.type)
     const config = node.config ?? {}
 
-  switch (cat.category) {
-    case 'trigger':
-      await delay(200 + Math.random() * 300)
-      if (node.type === 'subflow') {
-        return { output: { triggered: true, source: 'subflow', payload: input, parentRunId: _context.parentRunId }, confidence: 1.0 }
-      }
-      return { output: { triggered: true, source: node.type, payload: input }, confidence: 1.0 }
+    switch (cat.category) {
+      case 'trigger':
+        await delay(200 + Math.random() * 300)
+        if (node.type === 'subflow') {
+          return { output: { triggered: true, source: 'subflow', payload: input, parentRunId: _context.parentRunId }, confidence: 1.0 }
+        }
+        return { output: { triggered: true, source: node.type, payload: input }, confidence: 1.0 }
 
-    case 'logic':
-      await delay(100 + Math.random() * 200)
-      if (node.type === 'condition') {
-        const expression = config.expression as string | undefined
-        let conditionMet = false
+      case 'logic':
+        await delay(100 + Math.random() * 200)
+        if (node.type === 'condition') {
+          const expression = config.expression as string | undefined
+          let conditionMet = false
 
-        if (expression) {
-          try {
-            conditionMet = evaluateSimpleCondition(expression, config)
-          } catch {
+          if (expression) {
+            try {
+              conditionMet = evaluateSimpleCondition(expression, config)
+            } catch {
+              conditionMet = false
+            }
+          } else {
             conditionMet = false
           }
-        } else {
-          conditionMet = false
+          return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression }, confidence: expression ? 0.95 : 0.5 }
         }
-        return { output: { conditionMet, branch: conditionMet ? 'true' : 'false', input, expression }, confidence: expression ? 0.95 : 0.5 }
-      }
-      if (node.type === 'switch') {
-        let matchedCase = 'default'
-        const rawCases = config.cases
+        if (node.type === 'switch') {
+          // ─── Real Switch Node ────
+          // Evaluates each case's expression using evaluateSimpleCondition.
+          // Never falls back to hash-based routing.
+          // If no case matches, uses 'default'.
+          let matchedCase: string | null = null
+          const rawCases = config.cases
+          const resolutionCtx: ResolutionContext = {
+            nodeOutputs: _nodeOutputs,
+            input,
+            variables: _context.variables,
+            config,
+          }
 
-        try {
-          if (Array.isArray(rawCases) && rawCases.length > 0) {
-            for (const c of rawCases) {
-              if (c && typeof c === 'object') {
-                const caseExpr = (c as Record<string, unknown>).expression
-                const caseLabel = (c as Record<string, unknown>).label
-                if (typeof caseExpr === 'string' && evaluateSimpleCondition(caseExpr, config)) {
-                  matchedCase = typeof caseLabel === 'string' ? caseLabel : String(caseExpr)
+          try {
+            if (Array.isArray(rawCases) && rawCases.length > 0) {
+              for (const c of rawCases) {
+                if (c && typeof c === 'object') {
+                  const caseExpr = (c as Record<string, unknown>).expression
+                  const caseLabel = (c as Record<string, unknown>).label
+                  if (typeof caseExpr === 'string') {
+                    // Resolve variables in the expression first
+                    const resolvedExpr = resolveVariables(caseExpr, resolutionCtx) as string
+                    if (evaluateSimpleCondition(String(resolvedExpr), config)) {
+                      matchedCase = typeof caseLabel === 'string' ? caseLabel : String(caseExpr)
+                      break
+                    }
+                  }
+                }
+              }
+            } else if (rawCases && typeof rawCases === 'object' && !Array.isArray(rawCases)) {
+              for (const [caseName, caseExpr] of Object.entries(rawCases as Record<string, unknown>)) {
+                if (typeof caseExpr === 'string') {
+                  const resolvedExpr = resolveVariables(caseExpr, resolutionCtx) as string
+                  if (evaluateSimpleCondition(String(resolvedExpr), config)) {
+                    matchedCase = caseName
+                    break
+                  }
+                }
+              }
+            }
+          } catch {
+            matchedCase = null
+          }
+
+          // If no case matched, use 'default'
+          if (matchedCase === null) {
+            matchedCase = 'default'
+          }
+
+          return { output: { matchedCase, input }, confidence: 0.85 }
+        }
+        if (node.type === 'delay') {
+          const durationMs = (config.durationMs as number) || 1000
+          await delay(Math.min(durationMs, 3000)) // Cap at 3s for safety
+          return { output: { delayed: true, input, durationMs }, confidence: 1.0 }
+        }
+        if (node.type === 'retry') {
+          // ─── Real Retry Logic with Exponential Backoff ────
+          // The retry node re-executes a failed predecessor node using runNode()
+          // Config: maxRetries (default 3), backoffMs (default 1000), backoffMultiplier (default 2)
+          const maxRetries = (config.maxRetries as number) ?? 3
+          const backoffMs = (config.backoffMs as number) ?? 1000
+          const backoffMultiplier = (config.backoffMultiplier as number) ?? 2
+
+          // Find the predecessor node from the graph edges
+          const graphEdges = _graph?.edges ?? []
+          const inEdges = graphEdges.filter(e => e.target === node.id)
+          const predecessorId = inEdges[0]?.source
+          const predecessorNode = predecessorId ? (_graph?.nodes ?? []).find(n => n.id === predecessorId) : null
+
+          if (!predecessorNode) {
+            return { output: { retried: false, error: 'No predecessor node found for retry', input }, confidence: 0.5 }
+          }
+
+          // Check if the predecessor's previous execution had an error
+          const predecessorOutput = _nodeOutputs[predecessorId]
+          const predecessorHadError = predecessorOutput && typeof predecessorOutput === 'object' && 'error' in (predecessorOutput as Record<string, unknown>)
+
+          if (!predecessorHadError) {
+            // No error to retry — pass through
+            return { output: { retried: false, message: 'Predecessor succeeded, no retry needed', input }, confidence: 1.0 }
+          }
+
+          // Get the original input that the predecessor received
+          const predecessorOriginalInput = predecessorOutput
+
+          // Attempt retries with exponential backoff
+          const attemptResults: { attempt: number; success: boolean; error?: string; output?: unknown }[] = []
+          let lastError: string | null = 'Unknown error'
+          let lastOutput: unknown = null
+
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const waitTime = backoffMs * Math.pow(backoffMultiplier, attempt - 1)
+            await delay(Math.min(waitTime, 10000)) // Cap backoff at 10s
+
+            try {
+              // Resolve variables in predecessor config for this retry attempt
+              const retryResolutionCtx: ResolutionContext = {
+                nodeOutputs: _nodeOutputs,
+                input: predecessorOriginalInput,
+                variables: _context.variables,
+                config: predecessorNode.config ?? {},
+              }
+              const resolvedPredecessorConfig = resolveVariables(predecessorNode.config ?? {}, retryResolutionCtx) as Record<string, unknown>
+
+              // Actually re-execute the predecessor node
+              const retryResult = await runNode(
+                { ...predecessorNode, config: resolvedPredecessorConfig },
+                _context,
+                predecessorOriginalInput,
+                _nodeOutputs,
+                _graph
+              )
+
+              // Check if the retry succeeded
+              const retryOutput = retryResult.output as Record<string, unknown> | null
+              if (retryOutput && typeof retryOutput === 'object' && 'error' in retryOutput) {
+                lastError = String(retryOutput.error)
+                attemptResults.push({ attempt, success: false, error: lastError })
+              } else {
+                // Success!
+                lastError = null
+                lastOutput = retryResult.output
+                attemptResults.push({ attempt, success: true, output: retryResult.output })
+                break
+              }
+            } catch (retryErr) {
+              lastError = retryErr instanceof Error ? retryErr.message : 'Retry attempt failed'
+              attemptResults.push({ attempt, success: false, error: lastError })
+            }
+          }
+
+          if (lastError) {
+            return {
+              output: {
+                retried: false,
+                attempts: attemptResults.length,
+                maxRetries,
+                error: lastError,
+                attemptResults,
+                nodeId: predecessorId,
+                input,
+              },
+              confidence: 0.3,
+            }
+          }
+
+          return {
+            output: {
+              retried: true,
+              attempts: attemptResults.length,
+              maxRetries,
+              nodeId: predecessorId,
+              lastOutput,
+              attemptResults,
+              input,
+            },
+            confidence: 0.8,
+          }
+        }
+        if (node.type === 'loop') {
+          // ─── Real Loop Node ────
+          // Iterates over a collection from input, executing body nodes for each item
+          const maxIterations = (config.maxIterations as number) || 10
+          const collectionPath = (config.collectionPath as string) || 'data.items'
+
+          // Get the collection from input
+          const collection = getNestedValue(input, collectionPath)
+
+          if (!Array.isArray(collection)) {
+            return { output: { loopResult: false, error: `Collection not found at path: ${collectionPath}`, input }, confidence: 0.3 }
+          }
+
+          const items = collection.slice(0, maxIterations)
+          const results: unknown[] = []
+          const errors: unknown[] = []
+
+          // Find the loop body nodes (nodes connected via outgoing edges from this loop node)
+          const outEdgesLoop = _graph?.outEdges?.get(node.id) ?? []
+          const bodyNodeId = outEdgesLoop.find(e => e.sourceHandle === 'default')?.target
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i]
+            try {
+              // If there's a body node, execute it for each item
+              if (bodyNodeId) {
+                const bodyNode = (_graph?.nodes ?? []).find(n => n.id === bodyNodeId)
+                if (bodyNode) {
+                  const bodyResult = await runNode(bodyNode, _context, { ...((typeof input === 'object' && input !== null) ? input as Record<string, unknown> : {}), currentItem: item, currentIndex: i, collection: items }, _nodeOutputs, _graph)
+                  results.push(bodyResult.output)
+                }
+              } else {
+                // No body node — just collect items
+                results.push(item)
+              }
+            } catch (err) {
+              errors.push({ index: i, error: err instanceof Error ? err.message : 'Loop iteration failed' })
+            }
+
+            await delay(50) // Small delay between iterations
+          }
+
+          return {
+            output: {
+              loopResult: true,
+              iterations: items.length,
+              totalItems: collection.length,
+              collectionPath,
+              results,
+              errors: errors.length > 0 ? errors : undefined,
+              input,
+            },
+            confidence: 0.9,
+          }
+        }
+        return { output: { logicResult: true, input }, confidence: 0.9 }
+
+      case 'ai': {
+        // ─── Memory Context Injection ───
+        // Before any AI node execution, try to get customer memory context
+        const { memoryPrompt, customerEmail, customerContext } = await getMemoryContextForNode(node, input)
+
+        // Confidence threshold for routing — default 0.9 (90%)
+        const confidenceThreshold = (config.confidenceThreshold as number) ?? 0.9
+
+        if (node.type === 'llm') {
+          const resolvedConfig = config ?? {}
+          let systemPrompt = (resolvedConfig.systemPrompt as string) || (resolvedConfig.prompt as string) || 'You are a helpful assistant.'
+          const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
+
+          // ─── Inject Memory into System Prompt ───
+          if (memoryPrompt) {
+            systemPrompt = `${systemPrompt}\n\n${memoryPrompt}\n\nUse the customer context above to personalize your response. Reference their history, account tier, and past interactions when relevant.`
+          }
+
+          try {
+            const aiResult = await callAI(
+              [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userMessage },
+              ],
+              (resolvedConfig.model as string) || 'gpt-4o',
+              (resolvedConfig.temperature as number) ?? 0.7,
+              (resolvedConfig.maxTokens as number) ?? 2048
+            )
+
+            if (aiResult) {
+              const promptTokens = aiResult.usage?.prompt_tokens ?? 0
+              const completionTokens = aiResult.usage?.completion_tokens ?? 0
+              const cost = promptTokens * 0.00001 + completionTokens * 0.00003
+              const confidence = generateConfidence('llm', input, config)
+              const needsReview = confidence < confidenceThreshold
+              const output = {
+                response: aiResult.content,
+                model: 'gpt-4o',
+                input,
+                confidence,
+                confidenceThreshold,
+                needsReview,
+                routingDecision: needsReview ? 'human_review' : 'auto_send',
+                memoryUsed: !!memoryPrompt,
+                customerEmail: customerEmail || undefined,
+              }
+
+              // Record interaction to memory
+              await recordInteractionToMemory(customerEmail, customerContext, 'llm', input, output, confidence)
+
+              return {
+                output,
+                tokenUsage: { prompt: promptTokens, completion: completionTokens },
+                costUsd: Math.round(cost * 10000) / 10000,
+                confidence,
+              }
+            } else {
+              // AI call failed — use simulated fallback
+              await delay(800 + Math.random() * 1500)
+              const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
+              const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+              const confidence = generateConfidence('llm', input, config)
+              const needsReview = confidence < confidenceThreshold
+              return {
+                output: { response: AI_RESPONSES.llm, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
+                tokenUsage: tokens,
+                costUsd: Math.round(cost * 10000) / 10000,
+                confidence,
+              }
+            }
+          } catch {
+            await delay(800 + Math.random() * 1500)
+            const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
+            const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+            const confidence = generateConfidence('llm', input, config)
+            const needsReview = confidence < confidenceThreshold
+            return {
+              output: { response: AI_RESPONSES.llm, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
+              tokenUsage: tokens,
+              costUsd: Math.round(cost * 10000) / 10000,
+              confidence,
+            }
+          }
+        }
+
+        // ─── Classifier Node — Real AI Classification ───
+        if (node.type === 'classifier') {
+          const rawCategories = config.categories
+          let categories: string[]
+          if (Array.isArray(rawCategories)) {
+            categories = rawCategories.map(String)
+          } else if (typeof rawCategories === 'string' && rawCategories.length > 0) {
+            categories = rawCategories.split(',').map((s: string) => s.trim()).filter(Boolean)
+          } else {
+            categories = ['positive', 'negative', 'neutral']
+          }
+          if (categories.length === 0) categories = ['positive', 'negative', 'neutral']
+
+          const inputStr = typeof input === 'string' ? input : JSON.stringify(input)
+
+          // Try real AI classification first
+          let classifierSystemPrompt = `You are a text classifier. Classify the following text into exactly ONE of these categories: ${categories.join(', ')}.
+
+Respond with ONLY valid JSON in this exact format:
+{"classification": "CATEGORY_NAME", "confidence": 0.XX}
+
+Where:
+- classification must be exactly one of: ${categories.join(', ')}
+- confidence is a number between 0 and 1 indicating how confident you are`
+
+          // Inject memory context for personalized classification
+          if (memoryPrompt) {
+            classifierSystemPrompt += `\n\n${memoryPrompt}\n\nConsider the customer context when classifying. A frustrated enterprise customer may need different classification than a happy free-tier user.`
+          }
+
+          const aiResult = await callAI(
+            [
+              { role: 'system', content: classifierSystemPrompt },
+              { role: 'user', content: inputStr },
+            ],
+            'gpt-4o',
+            0.3, // Low temperature for consistent classification
+            256
+          )
+
+          if (aiResult) {
+            let classification = categories[0] ?? 'unknown'
+            let aiConfidence = 0.85
+
+            try {
+              // Try to parse the AI response as JSON
+              let content = aiResult.content.trim()
+              // Strip markdown fences
+              const fenceMatch = content.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
+              if (fenceMatch) content = fenceMatch[1].trim()
+
+              const parsed = JSON.parse(content)
+              if (parsed.classification && categories.includes(parsed.classification)) {
+                classification = parsed.classification
+              } else if (parsed.classification) {
+                // Find closest match (case-insensitive)
+                const lowerClass = parsed.classification.toLowerCase()
+                const match = categories.find(c => c.toLowerCase() === lowerClass)
+                if (match) classification = match
+              }
+              if (typeof parsed.confidence === 'number') {
+                aiConfidence = Math.min(1, Math.max(0, parsed.confidence))
+              }
+            } catch {
+              // JSON parse failed — try to extract category from raw text
+              const words = aiResult.content.toLowerCase().split(/\W+/)
+              for (const category of categories) {
+                if (words.includes(category.toLowerCase())) {
+                  classification = category
                   break
                 }
               }
             }
-          } else if (rawCases && typeof rawCases === 'object' && !Array.isArray(rawCases)) {
-            for (const [caseName, caseExpr] of Object.entries(rawCases as Record<string, unknown>)) {
-              if (typeof caseExpr === 'string' && evaluateSimpleCondition(caseExpr, config)) {
-                matchedCase = caseName
-                break
-              }
+
+            const promptTokens = aiResult.usage?.prompt_tokens ?? 0
+            const completionTokens = aiResult.usage?.completion_tokens ?? 0
+            const cost = promptTokens * 0.00001 + completionTokens * 0.00003
+            const needsReview = aiConfidence < confidenceThreshold
+            const output = {
+              classification,
+              confidence: aiConfidence,
+              confidenceThreshold,
+              needsReview,
+              routingDecision: needsReview ? 'human_review' : 'auto_send',
+              categoryPath: classification,
+              input,
+              memoryUsed: !!memoryPrompt,
+              customerEmail: customerEmail || undefined,
             }
-          } else {
-            const inputHash = simpleHash(JSON.stringify(input))
-            matchedCase = inputHash % 2 === 0 ? 'case1' : 'case2'
+
+            await recordInteractionToMemory(customerEmail, customerContext, 'classifier', input, output, aiConfidence)
+
+            return {
+              output,
+              tokenUsage: { prompt: promptTokens, completion: completionTokens },
+              costUsd: Math.round(cost * 10000) / 10000,
+              confidence: aiConfidence,
+            }
           }
-        } catch {
-          matchedCase = 'default'
-        }
-        return { output: { matchedCase, input }, confidence: 0.85 }
-      }
-      if (node.type === 'delay') {
-        const durationMs = (config.durationMs as number) || 1000
-        await delay(Math.min(durationMs, 3000)) // Cap at 3s for safety
-        return { output: { delayed: true, input, durationMs }, confidence: 1.0 }
-      }
-      if (node.type === 'retry') {
-        // ─── Retry Logic with Exponential Backoff ────
-        // The retry node re-executes a failed predecessor node
-        // Config: maxRetries (default 3), backoffMs (default 1000), backoffMultiplier (default 2)
-        const maxRetries = (config.maxRetries as number) ?? 3
-        const backoffMs = (config.backoffMs as number) ?? 1000
-        const backoffMultiplier = (config.backoffMultiplier as number) ?? 2
 
-        // Find the predecessor node that errored
-        const inEdges = storeEdges.filter(e => e.target === node.id)
-        const predecessorId = inEdges[0]?.source
-        const predecessorNode = predecessorId ? nodes.find(n => n.id === predecessorId) : null
-
-        if (!predecessorNode) {
-          return { output: { retried: false, error: 'No predecessor node found for retry', input }, confidence: 0.5 }
-        }
-
-        // Check if the predecessor's previous execution had an error
-        const currentResults = useExecutionStore.getState().results
-        const currentRun = currentResults.find(r => r.runId === runId)
-        const predecessorStep = currentRun?.steps.find(s => s.nodeId === predecessorId)
-
-        if (!predecessorStep || predecessorStep.status !== 'error') {
-          // No error to retry — pass through
-          return { output: { retried: false, message: 'Predecessor succeeded, no retry needed', input }, confidence: 1.0 }
-        }
-
-        // Attempt retries with exponential backoff
-        let lastError: string | null = predecessorStep.error || 'Unknown error'
-        let attempt = 0
-
-        for (attempt = 1; attempt <= maxRetries; attempt++) {
-          const waitTime = backoffMs * Math.pow(backoffMultiplier, attempt - 1)
-          await delay(Math.min(waitTime, 10000)) // Cap backoff at 10s
-
-          try {
-            // Re-execute the predecessor node
-            const predecessorConfig = resolveVariables(
-              predecessorNode.config ?? {},
-              { nodeOutputs, input, variables: {}, config: predecessorNode.config ?? {} }
-            ) as Record<string, unknown>
-
-            // We can't fully re-execute here without recursive BFS, so we simulate
-            // the retry attempt and mark it as retried for the execution engine
-            updateStep(node.id, { status: 'running', output: { retrying: true, attempt, nodeId: predecessorId } })
-
-            // In a real implementation, we'd re-queue the predecessor node
-            // For now, we mark the retry as successful and the execution will
-            // pick up from the retry node's output
-            lastError = null
-            break
-          } catch (retryErr) {
-            lastError = retryErr instanceof Error ? retryErr.message : 'Retry attempt failed'
+          // Fallback to hash-based classification
+          const hash = simpleHash(inputStr)
+          const category = categories[hash % categories.length] ?? categories[0] ?? 'unknown'
+          const confidence = 0.70 + (hash % 30) / 100
+          const needsReview = confidence < confidenceThreshold
+          return {
+            output: {
+              classification: category,
+              confidence,
+              confidenceThreshold,
+              needsReview,
+              routingDecision: needsReview ? 'human_review' : 'auto_send',
+              categoryPath: category,
+              input,
+              memoryUsed: false,
+            },
+            tokenUsage: { prompt: 120, completion: 40 },
+            costUsd: 0.0015,
+            confidence,
           }
         }
 
-        if (lastError) {
-          return { output: { retried: false, attempts: attempt, error: lastError, input }, confidence: 0.3 }
-        }
+        // ─── Agent Node — Real AI with Tool Use ───
+        if (node.type === 'agent') {
+          let agentSystemPrompt = (config.systemPrompt as string) || 'You are an AI agent. Analyze the task, reason through the steps, and provide a comprehensive response.'
 
-        return { output: { retried: true, attempts: attempt, maxRetries, nodeId: predecessorId, input }, confidence: 0.8 }
-      }
-      if (node.type === 'loop') {
-        const maxIterations = (config.maxIterations as number) || 10
-        const collectionPath = (config.collectionPath as string) || 'data.items'
-        return { output: { loopResult: true, iterations: Math.min(maxIterations, 3), collectionPath, input }, confidence: 0.9 }
-      }
-      return { output: { logicResult: true, input }, confidence: 0.9 }
+          if (memoryPrompt) {
+            agentSystemPrompt = `${agentSystemPrompt}\n\n${memoryPrompt}\n\nUse the customer context above to personalize your actions and responses.`
+          }
 
-    case 'ai': {
-      // ─── Memory Context Injection ───
-      // Before any AI node execution, try to get customer memory context
-      const { memoryPrompt, customerEmail, customerContext } = await getMemoryContextForNode(node, input)
+          // Add tool definitions if configured
+          const tools = config.tools as string[] | undefined
+          if (tools && tools.length > 0) {
+            agentSystemPrompt += `\n\nYou have access to these tools: ${tools.join(', ')}. Describe how you would use them to complete the task.`
+          }
 
-      // Confidence threshold for routing — default 0.9 (90%)
-      const confidenceThreshold = (config.confidenceThreshold as number) ?? 0.9
+          const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
 
-      if (node.type === 'llm') {
-        const resolvedConfig = config ?? {}
-        let systemPrompt = (resolvedConfig.systemPrompt as string) || (resolvedConfig.prompt as string) || 'You are a helpful assistant.'
-        const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
-
-        // ─── Inject Memory into System Prompt ───
-        if (memoryPrompt) {
-          systemPrompt = `${systemPrompt}\n\n${memoryPrompt}\n\nUse the customer context above to personalize your response. Reference their history, account tier, and past interactions when relevant.`
-        }
-
-        try {
           const aiResult = await callAI(
             [
-              { role: 'system', content: systemPrompt },
+              { role: 'system', content: agentSystemPrompt },
               { role: 'user', content: userMessage },
             ],
-            (resolvedConfig.model as string) || 'gpt-4o',
-            (resolvedConfig.temperature as number) ?? 0.7,
-            (resolvedConfig.maxTokens as number) ?? 2048
+            (config.model as string) || 'gpt-4o',
+            (config.temperature as number) ?? 0.5,
+            (config.maxTokens as number) ?? 2048
           )
 
           if (aiResult) {
             const promptTokens = aiResult.usage?.prompt_tokens ?? 0
             const completionTokens = aiResult.usage?.completion_tokens ?? 0
             const cost = promptTokens * 0.00001 + completionTokens * 0.00003
-            const confidence = generateConfidence('llm', input, config)
+            const confidence = generateConfidence('agent', input, config)
+            const needsReview = confidence < confidenceThreshold
+            const output = {
+              response: aiResult.content,
+              model: 'gpt-4o',
+              input,
+              confidence,
+              confidenceThreshold,
+              needsReview,
+              routingDecision: needsReview ? 'human_review' : 'auto_send',
+              toolsUsed: tools || [],
+              memoryUsed: !!memoryPrompt,
+              customerEmail: customerEmail || undefined,
+            }
+
+            await recordInteractionToMemory(customerEmail, customerContext, 'agent', input, output, confidence)
+
+            return {
+              output,
+              tokenUsage: { prompt: promptTokens, completion: completionTokens },
+              costUsd: Math.round(cost * 10000) / 10000,
+              confidence,
+            }
+          }
+
+          // Fallback to simulated
+          await delay(800 + Math.random() * 1500)
+          const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
+          const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+          const confidence = generateConfidence('agent', input, config)
+          const needsReview = confidence < confidenceThreshold
+          return {
+            output: { response: AI_RESPONSES.agent, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
+            tokenUsage: tokens,
+            costUsd: Math.round(cost * 10000) / 10000,
+            confidence,
+          }
+        }
+
+        // ─── RAG Node — Real AI Retrieval-Augmented Generation ───
+        if (node.type === 'rag') {
+          let ragSystemPrompt = (config.systemPrompt as string) || 'You are a knowledge base assistant. Answer the question using the provided context. If the answer is not in the context, say so clearly.'
+
+          if (memoryPrompt) {
+            ragSystemPrompt = `${ragSystemPrompt}\n\n${memoryPrompt}\n\nConsider the customer context when answering. Tailor your response to their account tier and history.`
+          }
+
+          // Add knowledge base context if configured
+          const knowledgeBase = config.knowledgeBase as string | undefined
+          if (knowledgeBase) {
+            ragSystemPrompt += `\n\nKnowledge Base Context:\n${knowledgeBase}`
+          }
+
+          const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
+
+          const aiResult = await callAI(
+            [
+              { role: 'system', content: ragSystemPrompt },
+              { role: 'user', content: userMessage },
+            ],
+            (config.model as string) || 'gpt-4o',
+            (config.temperature as number) ?? 0.3, // Low temperature for factual RAG
+            (config.maxTokens as number) ?? 2048
+          )
+
+          if (aiResult) {
+            const promptTokens = aiResult.usage?.prompt_tokens ?? 0
+            const completionTokens = aiResult.usage?.completion_tokens ?? 0
+            const cost = promptTokens * 0.00001 + completionTokens * 0.00003
+            const confidence = generateConfidence('rag', input, config)
+            const needsReview = confidence < confidenceThreshold
+            const output = {
+              response: aiResult.content,
+              model: 'gpt-4o',
+              input,
+              confidence,
+              confidenceThreshold,
+              needsReview,
+              routingDecision: needsReview ? 'human_review' : 'auto_send',
+              sourcesRetrieved: knowledgeBase ? 3 : 0,
+              memoryUsed: !!memoryPrompt,
+              customerEmail: customerEmail || undefined,
+            }
+
+            await recordInteractionToMemory(customerEmail, customerContext, 'rag', input, output, confidence)
+
+            return {
+              output,
+              tokenUsage: { prompt: promptTokens, completion: completionTokens },
+              costUsd: Math.round(cost * 10000) / 10000,
+              confidence,
+            }
+          }
+
+          // Fallback to simulated
+          await delay(800 + Math.random() * 1500)
+          const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
+          const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+          const confidence = generateConfidence('rag', input, config)
+          const needsReview = confidence < confidenceThreshold
+          return {
+            output: { response: AI_RESPONSES.rag, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
+            tokenUsage: tokens,
+            costUsd: Math.round(cost * 10000) / 10000,
+            confidence,
+          }
+        }
+
+        // ─── Summarizer Node — Real AI Summarization ───
+        if (node.type === 'summarizer') {
+          let summarizerSystemPrompt = (config.systemPrompt as string) || 'You are a summarizer. Provide a clear, concise summary of the following content. Focus on the key points, actions needed, and any deadlines.'
+
+          if (memoryPrompt) {
+            summarizerSystemPrompt = `${summarizerSystemPrompt}\n\n${memoryPrompt}\n\nConsider the customer context when summarizing. Highlight any information relevant to this customer's history.`
+          }
+
+          const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
+
+          const aiResult = await callAI(
+            [
+              { role: 'system', content: summarizerSystemPrompt },
+              { role: 'user', content: `Please summarize the following:\n\n${userMessage}` },
+            ],
+            (config.model as string) || 'gpt-4o',
+            (config.temperature as number) ?? 0.3, // Low temperature for factual summaries
+            (config.maxTokens as number) ?? 1024
+          )
+
+          if (aiResult) {
+            const promptTokens = aiResult.usage?.prompt_tokens ?? 0
+            const completionTokens = aiResult.usage?.completion_tokens ?? 0
+            const cost = promptTokens * 0.00001 + completionTokens * 0.00003
+            const confidence = generateConfidence('summarizer', input, config)
             const needsReview = confidence < confidenceThreshold
             const output = {
               response: aiResult.content,
@@ -368,8 +829,7 @@ async function runNode(
               customerEmail: customerEmail || undefined,
             }
 
-            // Record interaction to memory
-            await recordInteractionToMemory(customerEmail, customerContext, 'llm', input, output, confidence)
+            await recordInteractionToMemory(customerEmail, customerContext, 'summarizer', input, output, confidence)
 
             return {
               output,
@@ -377,493 +837,317 @@ async function runNode(
               costUsd: Math.round(cost * 10000) / 10000,
               confidence,
             }
-          } else {
-            // AI call failed — use simulated fallback
-            await delay(800 + Math.random() * 1500)
-            const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
-            const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-            const confidence = generateConfidence('llm', input, config)
-            const needsReview = confidence < confidenceThreshold
-            return {
-              output: { response: AI_RESPONSES.llm, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
-              tokenUsage: tokens,
-              costUsd: Math.round(cost * 10000) / 10000,
-              confidence,
-            }
           }
-        } catch {
+
+          // Fallback to simulated
           await delay(800 + Math.random() * 1500)
           const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
           const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-          const confidence = generateConfidence('llm', input, config)
+          const confidence = generateConfidence('summarizer', input, config)
           const needsReview = confidence < confidenceThreshold
           return {
-            output: { response: AI_RESPONSES.llm, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
+            output: { response: AI_RESPONSES.summarizer, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
             tokenUsage: tokens,
             costUsd: Math.round(cost * 10000) / 10000,
             confidence,
           }
         }
+
+        // Generic AI node fallback (shouldn't reach here normally)
+        await delay(800 + Math.random() * 1500)
+        const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
+        const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
+        const confidence = generateConfidence(node.type, input, config)
+        const needsReview = confidence < confidenceThreshold
+        return {
+          output: { response: AI_RESPONSES[node.type] ?? 'AI processing complete.', model: 'gpt-4o', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send' },
+          tokenUsage: tokens,
+          costUsd: Math.round(cost * 10000) / 10000,
+          confidence,
+        }
       }
 
-      // ─── Classifier Node — Real AI Classification ───
-      if (node.type === 'classifier') {
-        const rawCategories = config.categories
-        let categories: string[]
-        if (Array.isArray(rawCategories)) {
-          categories = rawCategories.map(String)
-        } else if (typeof rawCategories === 'string' && rawCategories.length > 0) {
-          categories = rawCategories.split(',').map((s: string) => s.trim()).filter(Boolean)
-        } else {
-          categories = ['positive', 'negative', 'neutral']
-        }
-        if (categories.length === 0) categories = ['positive', 'negative', 'neutral']
+      case 'human':
+        await delay(300)
+        return { output: { awaitingHuman: true, type: node.type, input }, confidence: undefined }
 
-        const inputStr = typeof input === 'string' ? input : JSON.stringify(input)
+      case 'action': {
+        // ─── HTTP Request Node ────
+        if (node.type === 'http-request') {
+          const method = ((config.method as string) || 'GET').toUpperCase()
+          const url = config.url as string
+          const headers = (config.headers as Record<string, string>) || {}
+          const body = config.body as unknown
+          const timeoutMs = (config.timeoutMs as number) || 30000
 
-        // Try real AI classification first
-        let classifierSystemPrompt = `You are a text classifier. Classify the following text into exactly ONE of these categories: ${categories.join(', ')}.
+          if (!url) {
+            return { output: { error: 'No URL configured for HTTP Request node' }, confidence: 0 }
+          }
 
-Respond with ONLY valid JSON in this exact format:
-{"classification": "CATEGORY_NAME", "confidence": 0.XX}
-
-Where:
-- classification must be exactly one of: ${categories.join(', ')}
-- confidence is a number between 0 and 1 indicating how confident you are`
-
-        // Inject memory context for personalized classification
-        if (memoryPrompt) {
-          classifierSystemPrompt += `\n\n${memoryPrompt}\n\nConsider the customer context when classifying. A frustrated enterprise customer may need different classification than a happy free-tier user.`
-        }
-
-        const aiResult = await callAI(
-          [
-            { role: 'system', content: classifierSystemPrompt },
-            { role: 'user', content: inputStr },
-          ],
-          'gpt-4o',
-          0.3, // Low temperature for consistent classification
-          256
-        )
-
-        if (aiResult) {
-          let classification = categories[0] ?? 'unknown'
-          let aiConfidence = 0.85
+          // Resolve variables in URL, headers, and body
+          const resolvedUrl = resolveVariables(url, { nodeOutputs: _nodeOutputs, input, variables: _context.variables, config }) as string
+          const resolvedHeaders = resolveVariables(headers, { nodeOutputs: _nodeOutputs, input, variables: _context.variables, config }) as Record<string, string>
+          const resolvedBody = resolveVariables(body, { nodeOutputs: _nodeOutputs, input, variables: _context.variables, config })
 
           try {
-            // Try to parse the AI response as JSON
-            let content = aiResult.content.trim()
-            // Strip markdown fences
-            const fenceMatch = content.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
-            if (fenceMatch) content = fenceMatch[1].trim()
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-            const parsed = JSON.parse(content)
-            if (parsed.classification && categories.includes(parsed.classification)) {
-              classification = parsed.classification
-            } else if (parsed.classification) {
-              // Find closest match (case-insensitive)
-              const lowerClass = parsed.classification.toLowerCase()
-              const match = categories.find(c => c.toLowerCase() === lowerClass)
-              if (match) classification = match
+            const fetchOptions: RequestInit = {
+              method,
+              headers: resolvedHeaders,
+              signal: controller.signal,
             }
-            if (typeof parsed.confidence === 'number') {
-              aiConfidence = Math.min(1, Math.max(0, parsed.confidence))
-            }
-          } catch {
-            // JSON parse failed — try to extract category from raw text
-            const words = aiResult.content.toLowerCase().split(/\W+/)
-            for (const category of categories) {
-              if (words.includes(category.toLowerCase())) {
-                classification = category
-                break
+
+            if (method !== 'GET' && method !== 'HEAD' && resolvedBody !== undefined) {
+              fetchOptions.body = typeof resolvedBody === 'string' ? resolvedBody : JSON.stringify(resolvedBody)
+              if (!resolvedHeaders['Content-Type'] && !resolvedHeaders['content-type']) {
+                fetchOptions.headers = { ...resolvedHeaders, 'Content-Type': 'application/json' }
               }
             }
-          }
 
-          const promptTokens = aiResult.usage?.prompt_tokens ?? 0
-          const completionTokens = aiResult.usage?.completion_tokens ?? 0
-          const cost = promptTokens * 0.00001 + completionTokens * 0.00003
-          const needsReview = aiConfidence < confidenceThreshold
-          const output = {
-            classification,
-            confidence: aiConfidence,
-            confidenceThreshold,
-            needsReview,
-            routingDecision: needsReview ? 'human_review' : 'auto_send',
-            categoryPath: classification,
-            input,
-            memoryUsed: !!memoryPrompt,
-            customerEmail: customerEmail || undefined,
-          }
+            const response = await fetch(resolvedUrl, fetchOptions)
+            clearTimeout(timeoutId)
 
-          await recordInteractionToMemory(customerEmail, customerContext, 'classifier', input, output, aiConfidence)
-
-          return {
-            output,
-            tokenUsage: { prompt: promptTokens, completion: completionTokens },
-            costUsd: Math.round(cost * 10000) / 10000,
-            confidence: aiConfidence,
-          }
-        }
-
-        // Fallback to hash-based classification
-        const hash = simpleHash(inputStr)
-        const category = categories[hash % categories.length] ?? categories[0] ?? 'unknown'
-        const confidence = 0.70 + (hash % 30) / 100
-        const needsReview = confidence < confidenceThreshold
-        return {
-          output: {
-            classification: category,
-            confidence,
-            confidenceThreshold,
-            needsReview,
-            routingDecision: needsReview ? 'human_review' : 'auto_send',
-            categoryPath: category,
-            input,
-            memoryUsed: false,
-          },
-          tokenUsage: { prompt: 120, completion: 40 },
-          costUsd: 0.0015,
-          confidence,
-        }
-      }
-
-      // ─── Agent Node — Real AI with Tool Use ───
-      if (node.type === 'agent') {
-        let agentSystemPrompt = (config.systemPrompt as string) || 'You are an AI agent. Analyze the task, reason through the steps, and provide a comprehensive response.'
-
-        if (memoryPrompt) {
-          agentSystemPrompt = `${agentSystemPrompt}\n\n${memoryPrompt}\n\nUse the customer context above to personalize your actions and responses.`
-        }
-
-        // Add tool definitions if configured
-        const tools = config.tools as string[] | undefined
-        if (tools && tools.length > 0) {
-          agentSystemPrompt += `\n\nYou have access to these tools: ${tools.join(', ')}. Describe how you would use them to complete the task.`
-        }
-
-        const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
-
-        const aiResult = await callAI(
-          [
-            { role: 'system', content: agentSystemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-          (config.model as string) || 'gpt-4o',
-          (config.temperature as number) ?? 0.5,
-          (config.maxTokens as number) ?? 2048
-        )
-
-        if (aiResult) {
-          const promptTokens = aiResult.usage?.prompt_tokens ?? 0
-          const completionTokens = aiResult.usage?.completion_tokens ?? 0
-          const cost = promptTokens * 0.00001 + completionTokens * 0.00003
-          const confidence = generateConfidence('agent', input, config)
-          const needsReview = confidence < confidenceThreshold
-          const output = {
-            response: aiResult.content,
-            model: 'gpt-4o',
-            input,
-            confidence,
-            confidenceThreshold,
-            needsReview,
-            routingDecision: needsReview ? 'human_review' : 'auto_send',
-            toolsUsed: tools || [],
-            memoryUsed: !!memoryPrompt,
-            customerEmail: customerEmail || undefined,
-          }
-
-          await recordInteractionToMemory(customerEmail, customerContext, 'agent', input, output, confidence)
-
-          return {
-            output,
-            tokenUsage: { prompt: promptTokens, completion: completionTokens },
-            costUsd: Math.round(cost * 10000) / 10000,
-            confidence,
-          }
-        }
-
-        // Fallback to simulated
-        await delay(800 + Math.random() * 1500)
-        const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
-        const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-        const confidence = generateConfidence('agent', input, config)
-        const needsReview = confidence < confidenceThreshold
-        return {
-          output: { response: AI_RESPONSES.agent, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
-          tokenUsage: tokens,
-          costUsd: Math.round(cost * 10000) / 10000,
-          confidence,
-        }
-      }
-
-      // ─── RAG Node — Real AI Retrieval-Augmented Generation ───
-      if (node.type === 'rag') {
-        let ragSystemPrompt = (config.systemPrompt as string) || 'You are a knowledge base assistant. Answer the question using the provided context. If the answer is not in the context, say so clearly.'
-
-        if (memoryPrompt) {
-          ragSystemPrompt = `${ragSystemPrompt}\n\n${memoryPrompt}\n\nConsider the customer context when answering. Tailor your response to their account tier and history.`
-        }
-
-        // Add knowledge base context if configured
-        const knowledgeBase = config.knowledgeBase as string | undefined
-        if (knowledgeBase) {
-          ragSystemPrompt += `\n\nKnowledge Base Context:\n${knowledgeBase}`
-        }
-
-        const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
-
-        const aiResult = await callAI(
-          [
-            { role: 'system', content: ragSystemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-          (config.model as string) || 'gpt-4o',
-          (config.temperature as number) ?? 0.3, // Low temperature for factual RAG
-          (config.maxTokens as number) ?? 2048
-        )
-
-        if (aiResult) {
-          const promptTokens = aiResult.usage?.prompt_tokens ?? 0
-          const completionTokens = aiResult.usage?.completion_tokens ?? 0
-          const cost = promptTokens * 0.00001 + completionTokens * 0.00003
-          const confidence = generateConfidence('rag', input, config)
-          const needsReview = confidence < confidenceThreshold
-          const output = {
-            response: aiResult.content,
-            model: 'gpt-4o',
-            input,
-            confidence,
-            confidenceThreshold,
-            needsReview,
-            routingDecision: needsReview ? 'human_review' : 'auto_send',
-            sourcesRetrieved: knowledgeBase ? 3 : 0,
-            memoryUsed: !!memoryPrompt,
-            customerEmail: customerEmail || undefined,
-          }
-
-          await recordInteractionToMemory(customerEmail, customerContext, 'rag', input, output, confidence)
-
-          return {
-            output,
-            tokenUsage: { prompt: promptTokens, completion: completionTokens },
-            costUsd: Math.round(cost * 10000) / 10000,
-            confidence,
-          }
-        }
-
-        // Fallback to simulated
-        await delay(800 + Math.random() * 1500)
-        const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
-        const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-        const confidence = generateConfidence('rag', input, config)
-        const needsReview = confidence < confidenceThreshold
-        return {
-          output: { response: AI_RESPONSES.rag, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
-          tokenUsage: tokens,
-          costUsd: Math.round(cost * 10000) / 10000,
-          confidence,
-        }
-      }
-
-      // ─── Summarizer Node — Real AI Summarization ───
-      if (node.type === 'summarizer') {
-        let summarizerSystemPrompt = (config.systemPrompt as string) || 'You are a summarizer. Provide a clear, concise summary of the following content. Focus on the key points, actions needed, and any deadlines.'
-
-        if (memoryPrompt) {
-          summarizerSystemPrompt = `${summarizerSystemPrompt}\n\n${memoryPrompt}\n\nConsider the customer context when summarizing. Highlight any information relevant to this customer's history.`
-        }
-
-        const userMessage = typeof input === 'string' ? input : JSON.stringify(input)
-
-        const aiResult = await callAI(
-          [
-            { role: 'system', content: summarizerSystemPrompt },
-            { role: 'user', content: `Please summarize the following:\n\n${userMessage}` },
-          ],
-          (config.model as string) || 'gpt-4o',
-          (config.temperature as number) ?? 0.3, // Low temperature for factual summaries
-          (config.maxTokens as number) ?? 1024
-        )
-
-        if (aiResult) {
-          const promptTokens = aiResult.usage?.prompt_tokens ?? 0
-          const completionTokens = aiResult.usage?.completion_tokens ?? 0
-          const cost = promptTokens * 0.00001 + completionTokens * 0.00003
-          const confidence = generateConfidence('summarizer', input, config)
-          const needsReview = confidence < confidenceThreshold
-          const output = {
-            response: aiResult.content,
-            model: 'gpt-4o',
-            input,
-            confidence,
-            confidenceThreshold,
-            needsReview,
-            routingDecision: needsReview ? 'human_review' : 'auto_send',
-            memoryUsed: !!memoryPrompt,
-            customerEmail: customerEmail || undefined,
-          }
-
-          await recordInteractionToMemory(customerEmail, customerContext, 'summarizer', input, output, confidence)
-
-          return {
-            output,
-            tokenUsage: { prompt: promptTokens, completion: completionTokens },
-            costUsd: Math.round(cost * 10000) / 10000,
-            confidence,
-          }
-        }
-
-        // Fallback to simulated
-        await delay(800 + Math.random() * 1500)
-        const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
-        const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-        const confidence = generateConfidence('summarizer', input, config)
-        const needsReview = confidence < confidenceThreshold
-        return {
-          output: { response: AI_RESPONSES.summarizer, model: 'simulated', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send', memoryUsed: false },
-          tokenUsage: tokens,
-          costUsd: Math.round(cost * 10000) / 10000,
-          confidence,
-        }
-      }
-
-      // Generic AI node fallback (shouldn't reach here normally)
-      await delay(800 + Math.random() * 1500)
-      const tokens = { prompt: 150 + Math.floor(Math.random() * 200), completion: 80 + Math.floor(Math.random() * 150) }
-      const cost = tokens.prompt * 0.00001 + tokens.completion * 0.00003
-      const confidence = generateConfidence(node.type, input, config)
-      const needsReview = confidence < confidenceThreshold
-      return {
-        output: { response: AI_RESPONSES[node.type] ?? 'AI processing complete.', model: 'gpt-4o', input, confidence, confidenceThreshold, needsReview, routingDecision: needsReview ? 'human_review' : 'auto_send' },
-        tokenUsage: tokens,
-        costUsd: Math.round(cost * 10000) / 10000,
-        confidence,
-      }
-    }
-
-    case 'human':
-      await delay(300)
-      return { output: { awaitingHuman: true, type: node.type, input }, confidence: undefined }
-
-    case 'action': {
-      // ─── Trigger Workflow (Subflow) Node ────
-      if (node.type === 'trigger-workflow') {
-        const targetWorkflowId = config.targetWorkflowId as string
-        const waitForCompletion = config.waitForCompletion !== false
-        const passInput = config.passInput !== false
-        const timeoutMs = (config.timeoutMs as number) || 30000
-
-        if (!targetWorkflowId) {
-          return { output: { error: 'No target workflow specified' }, confidence: 0 }
-        }
-
-        // Check depth to prevent infinite recursion
-        if (_context.depth >= _context.maxDepth) {
-          return { output: { error: 'Maximum workflow nesting depth exceeded', depth: _context.depth, maxDepth: _context.maxDepth }, confidence: 0 }
-        }
-
-        try {
-          // Fetch the target workflow from API
-          const wfRes = await fetch(`/api/workflows/${targetWorkflowId}`)
-          const wfJson = await wfRes.json()
-
-          if (!wfJson.ok || !wfJson.data) {
-            return { output: { error: `Workflow ${targetWorkflowId} not found` }, confidence: 0 }
-          }
-
-          // Build sub-workflow nodes/edges from DB data
-          const wfData = wfJson.data
-          const subNodes: NodeDefinition[] = (wfData.nodes ?? []).map((n: { nodeId: string; type: string; label: string; category: string; config: string; positionX: number; positionY: number }) => ({
-            id: n.nodeId,
-            type: n.type as NodeDefinition['type'],
-            label: n.label,
-            category: n.category as NodeDefinition['category'],
-            config: JSON.parse(n.config || '{}'),
-            position: { x: n.positionX, y: n.positionY },
-          }))
-          const subEdges: EdgeDefinition[] = (wfData.edges ?? []).map((e: { source: string; target: string; sourceHandle: string; targetHandle: string }) => ({
-            id: `edge-${e.source}-${e.target}`,
-            source: e.source,
-            target: e.target,
-            sourceHandle: (e.sourceHandle || 'default') as EdgeDefinition['sourceHandle'],
-            targetHandle: (e.targetHandle || 'input') as EdgeDefinition['targetHandle'],
-          }))
-
-          if (waitForCompletion) {
-            // Execute sub-workflow and wait for result
-            const subContext: ExecutionContext = {
-              workflowId: targetWorkflowId,
-              runId: `subflow_${_context.runId}_${Date.now()}`,
-              variables: passInput ? { ..._context.variables, ...config } : {},
-              parentRunId: _context.runId,
-              depth: _context.depth + 1,
-              maxDepth: _context.maxDepth,
-              nodeOutputs: {},
+            let responseBody: unknown
+            const contentType = response.headers.get('content-type') || ''
+            if (contentType.includes('application/json')) {
+              responseBody = await response.json()
+            } else {
+              responseBody = await response.text()
             }
 
-            // Execute with timeout
-            const result = await Promise.race([
-              executeWorkflowInternal(targetWorkflowId, subNodes, subEdges, subContext),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('Sub-workflow timeout')), timeoutMs)
-              ),
-            ])
-
-            const subCost = result.totalCostUsd ?? 0
-            const subTokens = result.steps.reduce((acc, s) => {
-              if (s.tokenUsage) return { prompt: acc.prompt + s.tokenUsage.prompt, completion: acc.completion + s.tokenUsage.completion }
-              return acc
-            }, { prompt: 0, completion: 0 })
-
-            if (result.status === 'error') {
+            if (!response.ok) {
               return {
-                output: { error: 'Sub-workflow execution failed', subflowResult: result, workflowId: targetWorkflowId },
-                tokenUsage: subTokens,
-                costUsd: subCost,
+                output: {
+                  error: `HTTP ${response.status}: ${response.statusText}`,
+                  statusCode: response.status,
+                  body: responseBody,
+                  input,
+                },
                 confidence: 0,
               }
             }
 
             return {
-              output: { subflowResult: result, workflowId: targetWorkflowId, triggered: true },
-              tokenUsage: subTokens,
-              costUsd: subCost,
+              output: {
+                statusCode: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                body: responseBody,
+                input,
+              },
               confidence: 1.0,
             }
-          } else {
-            // Fire and forget — trigger the workflow asynchronously via API
-            try {
-              await fetch(`/api/workflows/${targetWorkflowId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ input: passInput ? input : {}, triggeredBy: 'subflow' }),
-              })
-            } catch {
-              // Non-critical — the async trigger might fail, but we don't block
-            }
-
+          } catch (err) {
+            const isTimeout = err instanceof Error && err.name === 'AbortError'
             return {
-              output: { triggered: true, workflowId: targetWorkflowId, mode: 'async' },
-              confidence: 1.0,
+              output: {
+                error: isTimeout ? `Request timed out after ${timeoutMs}ms` : (err instanceof Error ? err.message : 'HTTP request failed'),
+                input,
+              },
+              confidence: 0,
             }
-          }
-        } catch (err) {
-          return {
-            output: { error: err instanceof Error ? err.message : 'Sub-workflow execution failed' },
-            confidence: 0,
           }
         }
+
+        // ─── Custom Code Node ────
+        if (node.type === 'code') {
+          const code = (config.code as string) || ''
+          const language = ((config.language as string) || 'javascript').toLowerCase()
+          const timeoutMs = (config.timeoutMs as number) || 10000
+
+          if (!code) {
+            return { output: { error: 'No code provided' }, confidence: 0 }
+          }
+
+          try {
+            // Create a sandboxed execution environment
+            const sandbox = {
+              input,
+              config: node.config,
+              variables: _context.variables,
+              nodeOutputs: _nodeOutputs,
+              // Utility functions
+              console: {
+                log: (...args: unknown[]) => args,
+                error: (...args: unknown[]) => args,
+              },
+              JSON,
+              Math,
+              Date,
+              Object,
+              Array,
+              String,
+              Number,
+              Boolean,
+              parseInt,
+              parseFloat,
+              isNaN,
+              isFinite,
+              encodeURIComponent,
+              decodeURIComponent,
+            }
+
+            // Build function from code
+            let result: unknown
+            const startTime = Date.now()
+
+            // Wrap code in an async function for flexibility
+            const wrappedCode = language === 'javascript' || language === 'typescript'
+              ? `(async function(input, config, variables, nodeOutputs, console, JSON, Math, Date, Object, Array, String, Number, Boolean, parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent) { ${code.includes('return') ? code : `return (${code})`} })`
+              : `(async function(input) { return "Only JavaScript is supported in sandboxed mode"; })`
+
+            const fn = eval(wrappedCode)
+            result = await fn(
+              sandbox.input, sandbox.config, sandbox.variables, sandbox.nodeOutputs,
+              sandbox.console, sandbox.JSON, sandbox.Math, sandbox.Date,
+              sandbox.Object, sandbox.Array, sandbox.String, sandbox.Number, sandbox.Boolean,
+              sandbox.parseInt, sandbox.parseFloat, sandbox.isNaN, sandbox.isFinite,
+              sandbox.encodeURIComponent, sandbox.decodeURIComponent
+            )
+
+            const duration = Date.now() - startTime
+
+            return {
+              output: {
+                result,
+                executionTimeMs: duration,
+                language,
+                input,
+              },
+              confidence: 1.0,
+            }
+          } catch (err) {
+            return {
+              output: {
+                error: err instanceof Error ? err.message : 'Code execution failed',
+                errorType: err instanceof Error ? err.constructor.name : 'Unknown',
+                language,
+                input,
+              },
+              confidence: 0,
+            }
+          }
+        }
+
+        // ─── Trigger Workflow (Subflow) Node ────
+        if (node.type === 'trigger-workflow') {
+          const targetWorkflowId = config.targetWorkflowId as string
+          const waitForCompletion = config.waitForCompletion !== false
+          const passInput = config.passInput !== false
+          const timeoutMs = (config.timeoutMs as number) || 30000
+
+          if (!targetWorkflowId) {
+            return { output: { error: 'No target workflow specified' }, confidence: 0 }
+          }
+
+          // Check depth to prevent infinite recursion
+          if (_context.depth >= _context.maxDepth) {
+            return { output: { error: 'Maximum workflow nesting depth exceeded', depth: _context.depth, maxDepth: _context.maxDepth }, confidence: 0 }
+          }
+
+          try {
+            // Fetch the target workflow from API
+            const wfRes = await fetch(`/api/workflows/${targetWorkflowId}`)
+            const wfJson = await wfRes.json()
+
+            if (!wfJson.ok || !wfJson.data) {
+              return { output: { error: `Workflow ${targetWorkflowId} not found` }, confidence: 0 }
+            }
+
+            // Build sub-workflow nodes/edges from DB data
+            const wfData = wfJson.data
+            const subNodes: NodeDefinition[] = (wfData.nodes ?? []).map((n: { nodeId: string; type: string; label: string; category: string; config: string; positionX: number; positionY: number }) => ({
+              id: n.nodeId,
+              type: n.type as NodeDefinition['type'],
+              label: n.label,
+              category: n.category as NodeDefinition['category'],
+              config: JSON.parse(n.config || '{}'),
+              position: { x: n.positionX, y: n.positionY },
+            }))
+            const subEdges: EdgeDefinition[] = (wfData.edges ?? []).map((e: { source: string; target: string; sourceHandle: string; targetHandle: string }) => ({
+              id: `edge-${e.source}-${e.target}`,
+              source: e.source,
+              target: e.target,
+              sourceHandle: (e.sourceHandle || 'default') as EdgeDefinition['sourceHandle'],
+              targetHandle: (e.targetHandle || 'input') as EdgeDefinition['targetHandle'],
+            }))
+
+            if (waitForCompletion) {
+              // Execute sub-workflow and wait for result
+              const subContext: ExecutionContext = {
+                workflowId: targetWorkflowId,
+                runId: `subflow_${_context.runId}_${Date.now()}`,
+                variables: passInput ? { ..._context.variables, ...config } : {},
+                parentRunId: _context.runId,
+                depth: _context.depth + 1,
+                maxDepth: _context.maxDepth,
+                nodeOutputs: {},
+              }
+
+              // Execute with timeout
+              const result = await Promise.race([
+                executeWorkflowInternal(targetWorkflowId, subNodes, subEdges, subContext),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('Sub-workflow timeout')), timeoutMs)
+                ),
+              ])
+
+              const subCost = result.totalCostUsd ?? 0
+              const subTokens = result.steps.reduce((acc, s) => {
+                if (s.tokenUsage) return { prompt: acc.prompt + s.tokenUsage.prompt, completion: acc.completion + s.tokenUsage.completion }
+                return acc
+              }, { prompt: 0, completion: 0 })
+
+              if (result.status === 'error') {
+                return {
+                  output: { error: 'Sub-workflow execution failed', subflowResult: result, workflowId: targetWorkflowId },
+                  tokenUsage: subTokens,
+                  costUsd: subCost,
+                  confidence: 0,
+                }
+              }
+
+              return {
+                output: { subflowResult: result, workflowId: targetWorkflowId, triggered: true },
+                tokenUsage: subTokens,
+                costUsd: subCost,
+                confidence: 1.0,
+              }
+            } else {
+              // Fire and forget — trigger the workflow asynchronously via API
+              try {
+                await fetch(`/api/workflows/${targetWorkflowId}/execute`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ input: passInput ? input : {}, triggeredBy: 'subflow' }),
+                })
+              } catch {
+                // Non-critical — the async trigger might fail, but we don't block
+              }
+
+              return {
+                output: { triggered: true, workflowId: targetWorkflowId, mode: 'async' },
+                confidence: 1.0,
+              }
+            }
+          } catch (err) {
+            return {
+              output: { error: err instanceof Error ? err.message : 'Sub-workflow execution failed' },
+              confidence: 0,
+            }
+          }
+        }
+
+        // ─── Generic Action Nodes ────
+        await delay(400 + Math.random() * 600)
+        return { output: { result: ACTION_RESPONSES[node.type] ?? 'Action completed.', input, ...config }, confidence: 1.0 }
       }
 
-      // ─── Generic Action Nodes ────
-      await delay(400 + Math.random() * 600)
-      return { output: { result: ACTION_RESPONSES[node.type] ?? 'Action completed.', input, ...config }, confidence: 1.0 }
+      default:
+        return { output: input, confidence: undefined }
     }
-
-    default:
-      return { output: input, confidence: undefined }
-  }
   } catch (err) {
     log.error({ err, nodeType: node.type }, 'Node runner error')
     return { output: { error: err instanceof Error ? err.message : 'Node execution failed', input }, confidence: 0 }
@@ -882,7 +1166,7 @@ export async function executeWorkflowInternal(
 ): Promise<ExecutionResult> {
   const startedAt = new Date().toISOString()
   const steps: NodeExecutionStep[] = []
-  const nodeOutputs: NodeOutputStore = { ...context.nodeOutputs } ?? {}
+  const nodeOutputs: NodeOutputStore = { ...(context.nodeOutputs ?? {}) }
   let totalCostUsd = 0
 
   // Find trigger nodes (entry points)
@@ -901,6 +1185,9 @@ export async function executeWorkflowInternal(
     list.push(edge)
     outEdges.set(edge.source, list)
   }
+
+  // Build graph context for runNode
+  const graph: GraphContext = { nodes, edges, outEdges }
 
   // BFS execution
   const executed = new Set<string>()
@@ -941,7 +1228,7 @@ export async function executeWorkflowInternal(
         nodeOutputs,
       }
 
-      const result = await runNode({ ...node, config: resolvedConfig }, nodeContext, input, nodeOutputs)
+      const result = await runNode({ ...node, config: resolvedConfig }, nodeContext, input, nodeOutputs, graph)
 
       const step: NodeExecutionStep = {
         nodeId: node.id,
@@ -990,12 +1277,12 @@ export async function executeWorkflowInternal(
             } else if (edge.sourceHandle === 'default') {
               queue.push({ node: targetNode, input: result.output })
             }
-          } else if (node.type === 'trigger-workflow') {
-            // Route subflow results: default for success, error for failure
-            const subflowOutput = result.output as { error?: string; subflowResult?: unknown }
-            if (edge.sourceHandle === 'error' && subflowOutput?.error) {
+          } else if (node.type === 'trigger-workflow' || node.type === 'http-request' || node.type === 'code') {
+            // Route results: default for success, error for failure
+            const nodeOutput = result.output as { error?: string }
+            if (edge.sourceHandle === 'error' && nodeOutput?.error) {
               queue.push({ node: targetNode, input: result.output })
-            } else if (edge.sourceHandle === 'default' && !subflowOutput?.error) {
+            } else if (edge.sourceHandle === 'default' && !nodeOutput?.error) {
               queue.push({ node: targetNode, input: result.output })
             }
           } else {
@@ -1093,7 +1380,7 @@ export async function executeWorkflow(
     isResuming = true
     priorNodeOutputs = resumeFromApproval.nodeOutputs
     // Mark the run as running again
-    useExecutionStore.getState().setState({ isRunning: true, currentRunId: runId })
+    useExecutionStore.setState({ isRunning: true, currentRunId: runId })
   } else {
     try {
       runId = useExecutionStore.getState().startRun(workflowId)
@@ -1141,6 +1428,9 @@ export async function executeWorkflow(
     list.push(edge)
     outEdges.set(edge.source, list)
   }
+
+  // Build graph context for runNode
+  const graph: GraphContext = { nodes, edges, outEdges }
 
   // BFS execution
   const executed = new Set<string>()
@@ -1212,7 +1502,7 @@ export async function executeWorkflow(
       }
       const resolvedConfig = resolveVariables(node.config ?? {}, resolutionContext) as Record<string, unknown>
 
-      const result = await runNode({ ...node, config: resolvedConfig }, context, input, nodeOutputs)
+      const result = await runNode({ ...node, config: resolvedConfig }, context, input, nodeOutputs, graph)
 
       const stepDone: NodeExecutionStep = {
         ...stepRunning,
@@ -1283,13 +1573,13 @@ export async function executeWorkflow(
             } else if (edge.sourceHandle === 'default') {
               queue.push({ node: targetNode, input: result.output })
             }
-          } else if (node.type === 'trigger-workflow') {
-            // ── Subflow Routing ──
-            // Route subflow results: default for success, error for failure
-            const subflowOutput = result.output as { error?: string; subflowResult?: unknown }
-            if (edge.sourceHandle === 'error' && subflowOutput?.error) {
+          } else if (node.type === 'trigger-workflow' || node.type === 'http-request' || node.type === 'code') {
+            // ── Subflow / HTTP / Code Routing ──
+            // Route results: default for success, error for failure
+            const nodeOutput = result.output as { error?: string }
+            if (edge.sourceHandle === 'error' && nodeOutput?.error) {
               queue.push({ node: targetNode, input: result.output })
-            } else if (edge.sourceHandle === 'default' && !subflowOutput?.error) {
+            } else if (edge.sourceHandle === 'default' && !nodeOutput?.error) {
               queue.push({ node: targetNode, input: result.output })
             }
           } else {

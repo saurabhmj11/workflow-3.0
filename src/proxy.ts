@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import type { NextRequest } from "next/server"
-import { checkRateLimit, getRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit"
+import { checkRateLimit, getRateLimitKey, RATE_LIMITS, type RateLimitConfig } from "@/lib/rate-limit"
 
 // ─── Proxy (Next.js 16) ─────────────────────────────
 // 1. Rate limiting (before auth — works even for unauthenticated requests)
@@ -14,7 +14,7 @@ async function handleRequest(request: NextRequest) {
 
   // ─── Rate Limiting (BEFORE auth) ──────────────────
   if (pathname.startsWith("/api/")) {
-    let rateLimitConfig = RATE_LIMITS.api // default: general API
+    let rateLimitConfig: RateLimitConfig = RATE_LIMITS.api // default: general API
 
     if (pathname.startsWith("/api/auth")) {
       rateLimitConfig = RATE_LIMITS.auth
@@ -25,7 +25,7 @@ async function handleRequest(request: NextRequest) {
     }
 
     const rateLimitKey = getRateLimitKey(request)
-    const rateLimitResult = checkRateLimit(rateLimitConfig, rateLimitKey)
+    const rateLimitResult = checkRateLimit(rateLimitKey, rateLimitConfig)
 
     if (!rateLimitResult.allowed) {
       return new NextResponse(

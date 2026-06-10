@@ -7,7 +7,7 @@ export const TRIGGER_TYPES = ['api', 'webhook', 'schedule', 'email', 'form', 'vo
 export const LOGIC_TYPES = ['condition', 'switch', 'loop', 'retry', 'delay'] as const
 export const AI_TYPES = ['llm', 'agent', 'rag', 'classifier', 'summarizer'] as const
 export const HUMAN_TYPES = ['approval', 'review', 'escalation'] as const
-export const ACTION_TYPES = ['crm', 'email', 'slack', 'whatsapp', 'database', 'trigger-workflow'] as const
+export const ACTION_TYPES = ['crm', 'email', 'slack', 'whatsapp', 'database', 'trigger-workflow', 'http-request', 'code'] as const
 
 export type TriggerType = (typeof TRIGGER_TYPES)[number]
 export type LogicType = (typeof LOGIC_TYPES)[number]
@@ -163,6 +163,9 @@ export function getSourceHandles(type: NodeType): SourceHandle[] {
   if (type === 'llm' || type === 'classifier' || type === 'agent') return ['high_confidence', 'low_confidence']
   // Trigger-workflow has success + error outputs
   if (type === 'trigger-workflow') return ['default', 'error']
+  // Code and HTTP Request nodes have default + error outputs
+  if (type === 'code') return ['default', 'error']
+  if (type === 'http-request') return ['default', 'error']
   return ['default']
 }
 

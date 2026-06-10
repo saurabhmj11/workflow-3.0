@@ -1,6 +1,6 @@
 // ─── Form Submission Handler ────────────────────
 // POST /api/triggers/form/[formId] — Receives form submissions
-// GET /api/triggers/form/[formId] — Returns the form HTML page
+// GET /api/triggers/form/[formId] — Returns the form schema/HTML
 
 import { db } from '@/lib/db'
 import { successResponse, errorResponse } from '@/lib/api-utils'
@@ -16,8 +16,8 @@ export async function POST(
   try {
     const { formId } = await params
 
-    const trigger = await db.webhookTrigger.findUnique({
-      where: { triggerId: formId },
+    const trigger = await db.formTrigger.findUnique({
+      where: { formId },
       include: { workflow: { select: { id: true, name: true, isActive: true } } },
     })
 
@@ -47,15 +47,7 @@ export async function POST(
 
     const runId = `run_form_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 
-    const workflow = await db.workflow.findUnique({
-      where: { id: trigger.workflowId },
-      include: { nodes: true },
-    })
-
-    if (!workflow || workflow.nodes.length === 0) {
-      return errorResponse('Workflow has no nodes', 400)
-    }
-
+    // Create an execution record for this form submission
     await db.execution.create({
       data: {
         workflowId: trigger.workflowId,
@@ -69,11 +61,16 @@ export async function POST(
       },
     })
 
-    await db.webhookTrigger.update({
+    // Increment form submit count
+    await db.formTrigger.update({
       where: { id: trigger.id },
-      data: { lastTriggeredAt: new Date(), triggerCount: { increment: 1 } },
+      data: {
+        submitCount: { increment: 1 },
+        lastSubmittedAt: new Date(),
+      },
     })
 
+    // Log the trigger
     await db.triggerLog.create({
       data: {
         triggerType: 'form',
@@ -89,19 +86,25 @@ export async function POST(
     const accept = request.headers.get('accept') || ''
     if (accept.includes('text/html')) {
       return new Response(
-        `<!DOCTYPE html><html><head><title>Thank You</title><style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f9fafb;}.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}.title{font-size:24px;font-weight:600;color:#111827;margin-bottom:8px;}.subtitle{font-size:16px;color:#6b7280;}</style></head><body><div class="card"><div style="font-size:48px;margin-bottom:16px;">✅</div><div class="title">Thank you!</div><div class="subtitle">Your submission has been received.</div></div></body></html>`,
+        `<!DOCTYPE html><html><head><title>Thank You</title><style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#0f172a;}.card{text-align:center;padding:40px;background:#1e293b;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.3);color:#e2e8f0;}.title{font-size:24px;font-weight:600;margin-bottom:8px;}.subtitle{font-size:16px;color:#94a3b8;}</style></head><body><div class="card"><div style="font-size:48px;margin-bottom:16px;">✅</div><div class="title">Thank you!</div><div class="subtitle">Your submission has been received.</div></div></body></html>`,
         { headers: { 'Content-Type': 'text/html' } }
       )
     }
 
-    return successResponse({ runId, workflowId: trigger.workflowId, status: 'running', message: 'Form submission received' })
+    return successResponse({
+      ok: true,
+      runId,
+      workflowId: trigger.workflowId,
+      status: 'running',
+      message: 'Form submission received and workflow triggered',
+    })
   } catch (err) {
     console.error('[POST /api/triggers/form/[formId]]', err)
     return errorResponse('Failed to process form submission', 500)
   }
 }
 
-// ─── GET — Show form HTML page ──────────────────
+// ─── GET — Return form schema ──────────────────
 
 export async function GET(
   request: Request,
@@ -110,30 +113,37 @@ export async function GET(
   try {
     const { formId } = await params
 
-    const trigger = await db.webhookTrigger.findUnique({ where: { triggerId: formId } })
+    const trigger = await db.formTrigger.findUnique({
+      where: { formId },
+      include: { workflow: { select: { name: true } } },
+    })
 
     if (!trigger) {
-      return new Response('<!DOCTYPE html><html><body><h1>Form not found</h1></body></html>', {
-        status: 404, headers: { 'Content-Type': 'text/html' },
+      return errorResponse('Form not found', 404)
+    }
+
+    const fields = JSON.parse(trigger.fields)
+
+    // Check if client wants JSON (API) or HTML (browser)
+    const accept = request.headers.get('accept') || ''
+    if (accept.includes('application/json')) {
+      return successResponse({
+        formId: trigger.formId,
+        name: trigger.name,
+        workflowName: trigger.workflow.name,
+        fields,
+        isActive: trigger.isActive,
+        submitCount: trigger.submitCount,
+        lastSubmittedAt: trigger.lastSubmittedAt?.toISOString() ?? null,
+        createdAt: trigger.createdAt.toISOString(),
       })
     }
 
-    if (!trigger.isActive) {
-      return new Response('<!DOCTYPE html><html><body><h1>This form is no longer accepting submissions</h1></body></html>', {
-        status: 400, headers: { 'Content-Type': 'text/html' },
-      })
-    }
-
-    const title = trigger.description?.replace('[FORM] ', '') || 'Contact Form'
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const actionUrl = `${baseUrl}/api/triggers/form/${formId}`
-
-    const html = `<!DOCTYPE html><html><head><title>${title}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}.form-container{background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);padding:32px;max-width:480px;width:100%}.form-title{font-size:24px;font-weight:600;color:#111827;margin-bottom:24px;text-align:center}.form-field{margin-bottom:16px}.form-field label{display:block;font-size:14px;font-weight:500;color:#374151;margin-bottom:4px}.form-field input,.form-field textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:16px}.form-field input:focus,.form-field textarea:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,0.1)}.form-field textarea{min-height:100px;resize:vertical}.submit-btn{width:100%;padding:12px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:white;border:none;border-radius:6px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}.submit-btn:hover{opacity:0.9}.branding{text-align:center;margin-top:16px;font-size:12px;color:#9ca3af}
-</style></head><body><div class="form-container"><div class="form-title">${title}</div><form action="${actionUrl}" method="POST"><div class="form-field"><label for="name">Name *</label><input type="text" id="name" name="name" required/></div><div class="form-field"><label for="email">Email *</label><input type="email" id="email" name="email" required/></div><div class="form-field"><label for="message">Message *</label><textarea id="message" name="message" required></textarea></div><button type="submit" class="submit-btn">Submit</button></form><div class="branding">Powered by OpenWorkflow</div></div></body></html>`
-
-    return new Response(html, { headers: { 'Content-Type': 'text/html' } })
+    // Return HTML page for browsers (fallback, main rendering is at /f/[formId])
+    return new Response(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${trigger.name}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}.container{background:#1e293b;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.3);padding:32px;max-width:480px;width:100%;color:#e2e8f0}.title{font-size:24px;font-weight:600;margin-bottom:24px;text-align:center}.field{margin-bottom:16px}.field label{display:block;font-size:14px;font-weight:500;color:#94a3b8;margin-bottom:4px}.field input,.field textarea,.field select{width:100%;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:6px;font-size:16px;color:#e2e8f0}.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,0.15)}.field textarea{min-height:100px;resize:vertical}.submit-btn{width:100%;padding:12px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:white;border:none;border-radius:6px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}.submit-btn:hover{opacity:0.9}.branding{text-align:center;margin-top:16px;font-size:12px;color:#475569}</style></head><body><div class="container"><div class="title">${trigger.name}</div><form action="/api/triggers/form/${formId}" method="POST">${fields.map((f: { name: string; type: string; label: string; required?: boolean; placeholder?: string; options?: string[] }) => { if (f.type === 'textarea') return `<div class="field"><label for="${f.name}">${f.label}${f.required ? ' *' : ''}</label><textarea id="${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" ${f.required ? 'required' : ''}></textarea></div>`; if (f.type === 'select') return `<div class="field"><label for="${f.name}">${f.label}${f.required ? ' *' : ''}</label><select id="${f.name}" name="${f.name}" ${f.required ? 'required' : ''}><option value="">Select...</option>${(f.options || []).map((o: string) => `<option value="${o}">${o}</option>`).join('')}</select></div>`; return `<div class="field"><label for="${f.name}">${f.label}${f.required ? ' *' : ''}</label><input type="${f.type}" id="${f.name}" name="${f.name}" placeholder="${f.placeholder || ''}" ${f.required ? 'required' : ''}/></div>` }).join('')}<button type="submit" class="submit-btn">Submit</button></form><div class="branding">Powered by OpenWorkflow</div></div></body></html>`,
+      { headers: { 'Content-Type': 'text/html' } }
+    )
   } catch (err) {
     console.error('[GET /api/triggers/form/[formId]]', err)
     return errorResponse('Failed to load form', 500)

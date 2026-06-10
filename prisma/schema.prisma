@@ -105,6 +105,7 @@ model Workflow {
   webhookTriggers   WebhookTrigger[]
   scheduleTriggers  ScheduleTrigger[]
   emailTriggers     EmailTrigger[]
+  formTriggers      FormTrigger[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -369,9 +370,26 @@ model EmailTrigger {
   updatedAt    DateTime @updatedAt
 }
 
+// ─── Form Trigger ─────────────────────────────────
+// Public form triggers that accept submissions and execute workflows
+
+model FormTrigger {
+  id              String    @id @default(cuid())
+  formId          String    @unique @default(cuid())
+  name            String
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fields          String    @default("[]")  // JSON array of field definitions
+  isActive        Boolean   @default(true)
+  submitCount     Int       @default(0)
+  lastSubmittedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model TriggerLog {
   id          String   @id @default(cuid())
-  triggerType String   // webhook, schedule, email
+  triggerType String   // webhook, schedule, email, form
   triggerId   String   // Reference to the specific trigger
   workflowId  String
   payload     String   // JSON string of the trigger payload
@@ -440,4 +458,16 @@ model ApiKey {
   createdAt   DateTime  @default(now())
 
   @@unique([keyPrefix])
+}
+
+// ─── Rate Limiting ──────────────────────────────────
+// Persistent rate limit entries for cross-instance rate limiting
+
+model RateLimitEntry {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  count     Int      @default(0)
+  resetTime DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

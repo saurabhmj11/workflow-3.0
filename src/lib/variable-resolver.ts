@@ -221,8 +221,8 @@ interface ConditionPart {
 }
 
 function parseComparison(left: string, op: ComparisonOperator, right: string): ConditionPart | null {
-  let parsedRight: unknown = right.trim()
-  let parsedLeft: unknown = left.trim()
+  let parsedRight: string | boolean | number | null | undefined = right.trim()
+  let parsedLeft: string | boolean | number | null | undefined = left.trim()
 
   // Parse right side
   if (parsedRight.startsWith('"') && parsedRight.endsWith('"')) {

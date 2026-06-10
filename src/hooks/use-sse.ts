@@ -41,10 +41,14 @@ export function useSSE() {
         try {
           const msg: SSEMessage = JSON.parse((e as MessageEvent).data)
           if (msg.action === 'step_update' && msg.nodeId && msg.status) {
-            updateStep(msg.nodeId as string, {
+            updateStep(msg.runId as string, {
+              nodeId: msg.nodeId as string,
+              nodeType: (msg.nodeType as string) ?? 'unknown',
+              label: (msg.nodeLabel as string) ?? '',
+              startedAt: (msg.startedAt as string) ?? new Date().toISOString(),
               status: msg.status as 'running' | 'success' | 'error' | 'pending',
+              input: msg.input,
               output: msg.output as Record<string, unknown> | undefined,
-              duration: msg.duration as number | undefined,
             })
           }
 
@@ -99,10 +103,13 @@ export function useSSE() {
           if (msg.action === 'new_approval') {
             addApproval({
               id: msg.id as string,
+              runId: (msg.runId as string) ?? '',
               nodeId: msg.nodeId as string,
-              nodeLabel: msg.nodeLabel as string,
-              type: msg.approvalType as 'approval' | 'review' | 'escalation',
-              context: msg.context as Record<string, unknown>,
+              workflowId: (msg.workflowId as string) ?? '',
+              assignee: msg.assignee as string | undefined,
+              status: 'pending',
+              context: (msg.context as Record<string, unknown>) ?? {},
+              createdAt: new Date().toISOString(),
               slaDeadline: msg.slaDeadline as string | undefined,
             })
 

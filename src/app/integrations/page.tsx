@@ -1,17 +1,14 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Bot,
   Plug,
   Settings,
   Check,
   Loader2,
-  ChevronRight,
   Link2,
   Shield,
-  ExternalLink,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -201,7 +198,7 @@ function OAuthDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-slate-100 sm:max-w-md">
+      <DialogContent className="bg-zinc-900 border-zinc-700 text-zinc-100 sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
             <div
@@ -211,10 +208,10 @@ function OAuthDialog({
               {integration.letter}
             </div>
             <div>
-              <DialogTitle className="text-slate-100 text-base">
+              <DialogTitle className="text-zinc-100 text-base">
                 Connect {integration.name}
               </DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs">
+              <DialogDescription className="text-zinc-400 text-xs">
                 Authorize OpenWorkflow to access your {integration.name} account
               </DialogDescription>
             </div>
@@ -224,16 +221,16 @@ function OAuthDialog({
         <div className="space-y-4 py-2">
           {/* Scopes */}
           <div>
-            <p className="text-xs font-medium text-slate-300 mb-2">
+            <p className="text-xs font-medium text-zinc-300 mb-2">
               OpenWorkflow requests the following permissions:
             </p>
             <div className="space-y-2">
               {integration.scopes.map((scope) => (
                 <div
                   key={scope}
-                  className="flex items-center gap-2.5 text-xs text-slate-400"
+                  className="flex items-center gap-2.5 text-xs text-zinc-400"
                 >
-                  <Shield className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <Shield className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                   <span>{scope}</span>
                 </div>
               ))}
@@ -241,10 +238,10 @@ function OAuthDialog({
           </div>
 
           {/* Security note */}
-          <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3">
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 p-3">
             <div className="flex items-start gap-2">
               <Plug className="h-3.5 w-3.5 text-cyan-400 mt-0.5 shrink-0" />
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
                 Your credentials are encrypted end-to-end. OpenWorkflow only
                 accesses data when your AI employees need it. You can revoke
                 access at any time.
@@ -257,7 +254,7 @@ function OAuthDialog({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 border-slate-700 text-slate-300 hover:text-slate-100 hover:bg-slate-800 text-xs"
+            className="h-9 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 text-xs"
             onClick={() => onOpenChange(false)}
             disabled={authorizing}
           >
@@ -290,7 +287,6 @@ function OAuthDialog({
 // ─── Main Integrations Page ──────────────────────────
 
 export default function IntegrationsPage() {
-  const router = useRouter()
   const [connected, setConnected] = useState<ConnectedIntegration[]>(INITIAL_CONNECTED)
   const [oauthTarget, setOauthTarget] = useState<AvailableIntegration | null>(null)
   const [oauthOpen, setOauthOpen] = useState(false)
@@ -341,86 +337,18 @@ export default function IntegrationsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* ─── Header Bar ──────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          {/* Left: Logo + Nav */}
-          <div className="flex items-center gap-6">
-            <div
-              className="flex items-center gap-2.5 cursor-pointer"
-              onClick={() => router.push('/')}
-            >
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <Bot className="h-4 w-4 text-white" />
-              </div>
-              <span className="text-sm font-bold text-slate-100">
-                OpenWorkflow
-              </span>
-            </div>
-
-            <nav className="hidden sm:flex items-center gap-1">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => router.push('/builder')}
-                className="px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
-              >
-                Builder
-              </button>
-              <button className="px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 text-slate-100">
-                Integrations
-              </button>
-              <button
-                onClick={() => router.push('/demo')}
-                className="px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
-              >
-                Demo
-              </button>
-            </nav>
-          </div>
-
-          {/* Right */}
-          <Button
-            size="sm"
-            className="h-8 gap-1.5 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-xs shadow-lg shadow-cyan-500/20"
-            onClick={() => router.push('/builder')}
-          >
-            <Plug className="h-3.5 w-3.5" />
-            New Integration
-          </Button>
-        </div>
-      </header>
-
-      {/* ─── Main Content ────────────────────────────── */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="hover:text-slate-300 transition-colors"
-          >
-            Dashboard
-          </button>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-slate-300">Integrations</span>
-        </div>
-
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         {/* Page Title */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Integrations</h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <h1 className="text-2xl font-bold text-zinc-100">Integrations</h1>
+            <p className="text-sm text-zinc-500 mt-1">
               Connect your tools to power your AI employees
             </p>
           </div>
           <Badge
             variant="outline"
-            className="text-[10px] bg-slate-800 border-slate-700 text-slate-400"
+            className="text-[10px] bg-zinc-800 border-zinc-700 text-zinc-400"
           >
             {connected.length} connected
           </Badge>
@@ -431,7 +359,7 @@ export default function IntegrationsPage() {
           <section>
             <div className="flex items-center gap-2 mb-4">
               <Link2 className="h-4 w-4 text-emerald-400" />
-              <h2 className="text-lg font-bold text-slate-100">Connected</h2>
+              <h2 className="text-lg font-bold text-zinc-100">Connected</h2>
               <Badge
                 variant="outline"
                 className="text-[9px] bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
@@ -444,7 +372,7 @@ export default function IntegrationsPage() {
               {connected.map((integration) => (
                 <Card
                   key={integration.id}
-                  className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-all duration-200 py-0"
+                  className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all duration-200 py-0"
                 >
                   <CardContent className="p-4 sm:p-5">
                     <div className="flex items-start gap-4">
@@ -459,7 +387,7 @@ export default function IntegrationsPage() {
                       {/* Info */}
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-semibold text-slate-100">
+                          <h3 className="text-sm font-semibold text-zinc-100">
                             {integration.name}
                           </h3>
                           <Badge
@@ -471,11 +399,11 @@ export default function IntegrationsPage() {
                           </Badge>
                         </div>
 
-                        <div className="flex items-center gap-4 text-xs text-slate-400">
+                        <div className="flex items-center gap-4 text-xs text-zinc-400">
                           <span>Connected {integration.connectedAgo}</span>
                           {integration.workspace && (
                             <>
-                              <span className="text-slate-600">·</span>
+                              <span className="text-zinc-600">·</span>
                               <span>
                                 Workspace: {integration.workspace}
                               </span>
@@ -484,10 +412,10 @@ export default function IntegrationsPage() {
                         </div>
 
                         <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-slate-500">
+                          <span className="text-zinc-500">
                             {integration.statLabel}:
                           </span>
-                          <span className="font-semibold text-slate-200">
+                          <span className="font-semibold text-zinc-200">
                             {integration.stat}
                           </span>
                         </div>
@@ -497,7 +425,7 @@ export default function IntegrationsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs gap-1.5 border-slate-700 text-slate-300 hover:text-slate-100 hover:bg-slate-800 hover:border-slate-600 shrink-0"
+                        className="h-8 text-xs gap-1.5 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600 shrink-0"
                       >
                         <Settings className="h-3 w-3" />
                         Configure
@@ -514,11 +442,11 @@ export default function IntegrationsPage() {
         {available.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <ExternalLink className="h-4 w-4 text-cyan-400" />
-              <h2 className="text-lg font-bold text-slate-100">Available</h2>
+              <Link2 className="h-4 w-4 text-cyan-400" />
+              <h2 className="text-lg font-bold text-zinc-100">Available</h2>
               <Badge
                 variant="outline"
-                className="text-[10px] bg-slate-800 border-slate-700 text-slate-400"
+                className="text-[10px] bg-zinc-800 border-zinc-700 text-zinc-400"
               >
                 {available.length} integrations
               </Badge>
@@ -530,7 +458,7 @@ export default function IntegrationsPage() {
                 return (
                   <Card
                     key={integration.id}
-                    className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-all duration-200 py-0"
+                    className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all duration-200 py-0"
                   >
                     <CardContent className="p-4 space-y-3">
                       {/* Header */}
@@ -542,12 +470,12 @@ export default function IntegrationsPage() {
                           {integration.letter}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-slate-100 truncate">
+                          <h3 className="text-sm font-semibold text-zinc-100 truncate">
                             {integration.name}
                           </h3>
                           <Badge
                             variant="outline"
-                            className="text-[9px] bg-slate-800/50 border-slate-700/50 text-slate-500"
+                            className="text-[9px] bg-zinc-800/50 border-zinc-700/50 text-zinc-500"
                           >
                             Not connected
                           </Badge>
@@ -555,7 +483,7 @@ export default function IntegrationsPage() {
                       </div>
 
                       {/* Description */}
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                      <p className="text-xs text-zinc-400 leading-relaxed">
                         {integration.description}
                       </p>
 
@@ -563,7 +491,7 @@ export default function IntegrationsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full h-8 text-xs gap-1.5 border-slate-700 text-slate-300 hover:text-slate-100 hover:bg-slate-800 hover:border-slate-600"
+                        className="w-full h-8 text-xs gap-1.5 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600"
                         onClick={() => handleConnect(integration)}
                         disabled={isConnecting}
                       >
@@ -590,12 +518,12 @@ export default function IntegrationsPage() {
         {/* ── Empty Connected State ──────────────────── */}
         {connected.length === 0 && (
           <section>
-            <Card className="bg-slate-900/50 border-slate-800 py-0">
+            <Card className="bg-zinc-900/50 border-zinc-800 py-0">
               <CardContent className="p-8 text-center space-y-3">
-                <div className="h-12 w-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto">
-                  <Plug className="h-6 w-6 text-slate-500" />
+                <div className="h-12 w-12 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center mx-auto">
+                  <Plug className="h-6 w-6 text-zinc-500" />
                 </div>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-zinc-400">
                   No integrations connected yet. Connect your first tool below
                   to get started.
                 </p>
@@ -603,47 +531,6 @@ export default function IntegrationsPage() {
             </Card>
           </section>
         )}
-      </main>
-
-      {/* ─── Footer ────────────────────────────────── */}
-      <footer className="border-t border-slate-800 bg-slate-950 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-5 w-5 rounded-md bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center">
-              <Bot className="h-2.5 w-2.5 text-white" />
-            </div>
-            <span className="text-[11px] text-slate-500">
-              OpenWorkflow — AI Employee Platform
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => router.push('/builder')}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Builder
-            </button>
-            <button
-              onClick={() => router.push('/integrations')}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Integrations
-            </button>
-            <button
-              onClick={() => router.push('/demo')}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Demo
-            </button>
-          </div>
-        </div>
-      </footer>
 
       {/* ─── OAuth Dialog ────────────────────────────── */}
       <OAuthDialog

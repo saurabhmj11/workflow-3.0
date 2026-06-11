@@ -20,13 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  ArrowLeft,
-  Headphones,
   Activity,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  Loader2,
   CheckCircle2,
   XCircle,
   Workflow,
@@ -42,8 +36,11 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 
 
 // ─── Types ─────────────────────────────────────────
@@ -178,7 +175,6 @@ function DetailViewer({ details }: { details: Record<string, unknown> | null }) 
 
 // ─── Main Audit Page ─────────────────────────────
 export default function AuditPage() {
-  const router = useRouter()
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
@@ -228,46 +224,7 @@ export default function AuditPage() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
-            onClick={() => router.push('/')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center">
-              <Activity className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-zinc-100">Audit Trail</h1>
-              <p className="text-[11px] text-zinc-500">Complete history of all actions</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-400">
-            <Clock className="h-2.5 w-2.5 mr-1" />
-            {total} events
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-[11px] text-zinc-400 hover:text-zinc-200 h-7"
-            onClick={fetchLogs}
-          >
-            <Activity className="h-3 w-3 mr-1" />
-            Refresh
-          </Button>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
         {/* Filters */}
         <Card className="bg-zinc-900/80 border-zinc-800">
           <CardContent className="p-4">
@@ -478,6 +435,5 @@ export default function AuditPage() {
           </div>
         )}
       </div>
-    </div>
   )
 }

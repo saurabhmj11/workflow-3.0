@@ -176,3 +176,28 @@ Added: Twilio, Stripe, Salesforce, Notion, Airtable, Google Sheets, Jira, GitHub
 | SSO | `/api/sso/*` | 4 |
 | White-label | `/api/whitelabel/*` | 3 |
 | **Total new** | | **~34** |
+
+---
+Task ID: phase4-frontend
+Agent: Main Agent
+Task: Phase 4: Frontend UI + Dashboard + Testing + Docs
+
+Work Log:
+- Audited entire frontend state: 15 page routes, 80+ API routes, 50+ UI components
+- Identified critical navigation inconsistency: each page had different nav (sidebar, top nav, back buttons)
+- Created shared AppLayout + AppSidebar components with consistent collapsible sidebar
+- Updated root layout.tsx to wrap all pages with AppLayout
+- Removed individual navigation from 11 pages (kept builder/demo/login/register as full-screen)
+- Added 16 frontend component tests for AppLayout and AppSidebar
+- Added 24 store tests (WorkflowStore, ExecutionStore, ApprovalStore, NotificationStore)
+- All 267 tests pass (227 original + 40 new)
+- Build compiles successfully with zero errors
+
+Stage Summary:
+- Created: src/components/layout/app-layout.tsx, src/components/layout/app-sidebar.tsx
+- Created: src/__tests__/app-layout.test.tsx, src/__tests__/stores.test.ts
+- Modified: 12 page files (removed individual navigation), src/app/layout.tsx
+- All pages now have consistent sidebar navigation with active route highlighting
+- Builder, Demo, Login, Register pages excluded from layout (full-screen)
+- Mobile responsive: sidebar slides in as overlay on small screens
+- Test coverage: 267 tests passing across 11 test files

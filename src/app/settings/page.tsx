@@ -51,7 +51,6 @@ import {
   Copy,
   Plus,
   Trash2,
-  ArrowLeft,
   Eye,
   EyeOff,
   Monitor,
@@ -970,28 +969,8 @@ function ApiKeysTab() {
 // ─── Main Settings Page ────────────────────────────
 
 function SettingsContent() {
-  const router = useRouter()
-
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-6 py-3 flex items-center gap-4 shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-zinc-400 hover:text-zinc-200"
-          onClick={() => router.push('/')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Settings</h1>
-          <p className="text-xs text-zinc-500">Manage your account and preferences</p>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 p-6 max-w-3xl mx-auto w-full">
+    <div className="max-w-3xl mx-auto w-full p-6">
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="bg-zinc-900 border border-zinc-800 w-full justify-start h-auto p-1 gap-1">
             <TabsTrigger
@@ -1047,7 +1026,6 @@ function SettingsContent() {
             <ApiKeysTab />
           </TabsContent>
         </Tabs>
-      </main>
     </div>
   )
 }

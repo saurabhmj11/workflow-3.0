@@ -351,29 +351,7 @@ export default function AnalyticsPage() {
   }, [results])
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Navigation */}
-      <nav className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="text-lg font-bold text-white">OpenWorkflow</Link>
-            <div className="flex gap-6">
-              <Link href="/dashboard" className="text-sm text-slate-400 hover:text-white transition-colors">Dashboard</Link>
-              <Link href="/builder" className="text-sm text-slate-400 hover:text-white transition-colors">Builder</Link>
-              <Link href="/analytics" className="text-sm text-violet-400 font-medium">Analytics</Link>
-              <Link href="/integrations" className="text-sm text-slate-400 hover:text-white transition-colors">Integrations</Link>
-              <Link href="/memory" className="text-sm text-slate-400 hover:text-white transition-colors">Memory</Link>
-              <Link href="/demo" className="text-sm text-slate-400 hover:text-white transition-colors">Demo</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Workflow Analytics</h1>
-          <p className="text-slate-400">Cost, performance, and ROI across all AI employees</p>
-        </div>
+    <div className="max-w-7xl mx-auto px-6 py-8">
 
         {!hasData ? (
           <EmptyState />
@@ -683,7 +661,6 @@ export default function AnalyticsPage() {
             </Tabs>
           </>
         )}
-      </div>
     </div>
   )
 }

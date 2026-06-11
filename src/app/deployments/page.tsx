@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Rocket, ArrowRight, ArrowLeft, RotateCcw, CheckCircle2,
+  Rocket, ArrowRight, RotateCcw, CheckCircle2,
   Clock, AlertCircle, Loader2, GitBranch,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
@@ -150,7 +150,7 @@ export default function DeploymentsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-32">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-emerald-400" />
           <p className="text-sm text-zinc-400">Loading deployments...</p>
@@ -160,32 +160,7 @@ export default function DeploymentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-zinc-500 hover:text-zinc-300 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center">
-              <Rocket className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-zinc-100">Deployments</h1>
-              <p className="text-xs text-zinc-500">Manage workflow deployments across environments</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">
-            <Rocket className="h-2.5 w-2.5 mr-1" />
-            {environments.length} environments
-          </Badge>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6">
+    <div className="max-w-7xl mx-auto px-6 py-6">
         <Tabs defaultValue="pipeline" className="space-y-6">
           <TabsList className="bg-zinc-900 border border-zinc-800">
             <TabsTrigger value="pipeline" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
@@ -413,7 +388,6 @@ export default function DeploymentsPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   )
 }

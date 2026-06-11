@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  Activity, ArrowLeft, Clock, CheckCircle2, XCircle,
+  Activity, Clock, CheckCircle2, XCircle,
   Loader2, Search, Eye, ChevronDown, ChevronUp, Zap,
   Timer, AlertTriangle, BarChart3, FileText,
 } from 'lucide-react'
@@ -201,7 +200,7 @@ export default function ObservabilityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-32">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
           <p className="text-sm text-zinc-400">Loading observability data...</p>
@@ -211,32 +210,7 @@ export default function ObservabilityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-zinc-500 hover:text-zinc-300 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-zinc-100">Observability</h1>
-              <p className="text-xs text-zinc-500">Traces, logs, and platform metrics</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-7 text-[11px] text-zinc-400 hover:text-zinc-200" onClick={() => { fetchTraces(); fetchLogs() }}>
-            <Activity className="h-3 w-3 mr-1" />
-            Refresh
-          </Button>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6">
+    <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Metrics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card className="bg-zinc-900/80 border-zinc-800">
@@ -471,7 +445,6 @@ export default function ObservabilityPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   )
 }

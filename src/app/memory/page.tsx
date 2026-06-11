@@ -16,7 +16,6 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  ArrowLeft,
   Mail,
   Phone,
   MessageSquare,
@@ -692,35 +691,7 @@ export default function MemoryPage() {
 
   // ─── Render ────────────────────────────────────
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-zinc-500 hover:text-zinc-300 transition-colors">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-violet-600 to-pink-500 flex items-center justify-center">
-                <Brain className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-zinc-100">Agent Memory Layer</h1>
-                <p className="text-xs text-zinc-500">Customer context & knowledge management for AI employees</p>
-              </div>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] border-violet-500/30 text-violet-400">
-                <Zap className="h-2.5 w-2.5 mr-0.5" />
-                {analytics ? `${analytics.overview.totalCustomers} customers` : 'Loading...'}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-zinc-900 border border-zinc-800">
             <TabsTrigger value="overview" className="data-[state=active]:bg-violet-600 data-[state=active]:text-white">
@@ -756,6 +727,5 @@ export default function MemoryPage() {
           </div>
         </Tabs>
       </div>
-    </div>
   )
 }

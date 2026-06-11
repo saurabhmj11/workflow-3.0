@@ -10,8 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import {
-  Headphones,
-  ArrowLeft,
   CheckCircle2,
   AlertTriangle,
   DollarSign,
@@ -28,7 +26,6 @@ import {
   Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -101,7 +98,6 @@ function MetricCard({
 
 // ─── Main Dashboard Page ─────────────────────────
 export default function AIEmployeeDashboard() {
-  const router = useRouter()
   const results = useExecutionStore((s) => s.results)
   const approvalRequests = useApprovalStore((s) => s.requests)
   const [isLoading, setIsLoading] = useState(true)
@@ -240,7 +236,7 @@ export default function AIEmployeeDashboard() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-zinc-950">
+      <div className="flex items-center justify-center py-32">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
           <p className="text-sm text-zinc-400">Loading AI Employee Dashboard...</p>
@@ -250,42 +246,7 @@ export default function AIEmployeeDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
-            onClick={() => router.push('/')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-600 to-violet-600 flex items-center justify-center">
-              <Headphones className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-zinc-100">AI Employee Dashboard</h1>
-              <p className="text-[11px] text-zinc-500">Real-time performance metrics</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-400">
-            <Activity className="h-2.5 w-2.5 mr-1" />
-            Live
-          </Badge>
-          {metrics.pendingApprovals > 0 && (
-            <Badge variant="destructive" className="text-[10px]">
-              {metrics.pendingApprovals} pending approvals
-            </Badge>
-          )}
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Top Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
@@ -656,41 +617,46 @@ export default function AIEmployeeDashboard() {
 
         {/* Bottom Section: Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={() => router.push('/')}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-200">Build Workflow</p>
-                <p className="text-[10px] text-zinc-500">Create or edit AI employee workflows</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer" onClick={() => router.push('/')}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                <Brain className="h-5 w-5 text-violet-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-200">AI Generate</p>
-                <p className="text-[10px] text-zinc-500">Describe a workflow, AI builds it</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-amber-500/30 transition-colors cursor-pointer" onClick={() => router.push('/')}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-200">Review Approvals</p>
-                <p className="text-[10px] text-zinc-500">{metrics.pendingApprovals} pending human reviews</p>
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/builder">
+            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">Build Workflow</p>
+                  <p className="text-[10px] text-zinc-500">Create or edit AI employee workflows</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/builder">
+            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                  <Brain className="h-5 w-5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">AI Generate</p>
+                  <p className="text-[10px] text-zinc-500">Describe a workflow, AI builds it</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/dashboard">
+            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-amber-500/30 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">Review Approvals</p>
+                  <p className="text-[10px] text-zinc-500">{metrics.pendingApprovals} pending human reviews</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
-      </div>
     </div>
   )
 }

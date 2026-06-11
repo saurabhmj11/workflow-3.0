@@ -1,36 +1,16 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import {
   Zap, Users, Activity, BarChart3, Plug, Brain, Settings,
   Rocket, FlaskConical, Eye, Phone, MessageSquare, Bot,
-  Shield, Palette, ChevronRight, ArrowRight, Workflow,
+  Shield, Palette, ArrowRight, Workflow,
   Layers, GitBranch, Clock, CheckCircle2, Headphones,
   LayoutDashboard, Wrench, Cpu,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
-
-// ─── Navigation Items ───────────────────────────────
-
-const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: LayoutDashboard, color: 'text-zinc-400' },
-  { href: '/builder', label: 'Builder', icon: Workflow, color: 'text-violet-400' },
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3, color: 'text-cyan-400' },
-  { href: '/analytics', label: 'Analytics', icon: Activity, color: 'text-emerald-400' },
-  { href: '/integrations', label: 'Integrations', icon: Plug, color: 'text-orange-400' },
-  { href: '/memory', label: 'Memory / CRM', icon: Brain, color: 'text-pink-400' },
-  { href: '/deployments', label: 'Deployments', icon: Rocket, color: 'text-emerald-400' },
-  { href: '/testing', label: 'Testing', icon: FlaskConical, color: 'text-amber-400' },
-  { href: '/observability', label: 'Observability', icon: Eye, color: 'text-violet-400' },
-  { href: '/plugins', label: 'Plugins', icon: Layers, color: 'text-cyan-400' },
-  { href: '/audit', label: 'Audit Trail', icon: Shield, color: 'text-emerald-400' },
-  { href: '/settings', label: 'Settings', icon: Settings, color: 'text-zinc-400' },
-]
 
 // ─── Feature Cards Data ─────────────────────────────
 
@@ -139,307 +119,220 @@ const QUICK_STATS = [
 // ─── Main Page ──────────────────────────────────────
 
 export default function HomePage() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex">
-      {/* ─── Sidebar ──────────────────────────────── */}
-      <aside className={`border-r border-zinc-800 bg-zinc-900/80 backdrop-blur-sm flex flex-col transition-all duration-200 shrink-0 ${
-        sidebarCollapsed ? 'w-16' : 'w-56'
-      }`}>
-        {/* Logo */}
-        <div className="p-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0">
-            <Zap className="h-4 w-4 text-white" />
-          </div>
-          {!sidebarCollapsed && (
-            <div>
-              <h1 className="text-sm font-bold text-white leading-tight">OpenWorkflow</h1>
-              <p className="text-[10px] text-zinc-500">AI Workflow Platform</p>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <ScrollArea className="flex-1">
-          <nav className="p-2 space-y-0.5">
-            {NAV_ITEMS.map(item => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-zinc-800/60 group ${
-                    item.href === '/' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  <Icon className={`h-4 w-4 shrink-0 ${item.color}`} />
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </Link>
-              )
-            })}
-          </nav>
-        </ScrollArea>
-
-        {/* Collapse Toggle */}
-        <div className="p-2 border-t border-zinc-800">
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-colors"
-          >
-            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-            {!sidebarCollapsed && <span className="text-[10px]">Collapse</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* ─── Main Content ──────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
-        <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-xl font-bold text-white">OpenWorkflow Platform</h2>
-            <p className="text-xs text-zinc-500">Build, deploy, and monitor AI-powered workflows</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-400">
-              <Zap className="h-2.5 w-2.5 mr-1" />
-              v3.0
-            </Badge>
-            <Link href="/builder">
-              <Button size="sm" className="h-8 text-xs bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white">
-                <Workflow className="h-3.5 w-3.5 mr-1.5" />
-                New Workflow
-              </Button>
-            </Link>
-          </div>
-        </header>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {QUICK_STATS.map(stat => {
-                const Icon = stat.icon
-                return (
-                  <Card key={stat.label} className="bg-zinc-900/80 border-zinc-800">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon className={`h-4 w-4 ${stat.color}`} />
-                        <span className="text-xs text-zinc-500">{stat.label}</span>
-                      </div>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-
-            {/* Hero Section */}
-            <Card className="bg-gradient-to-br from-violet-950/50 to-cyan-950/50 border-violet-500/20">
-              <CardContent className="p-8">
-                <div className="flex items-start gap-6">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0">
-                    <Cpu className="h-7 w-7 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      AI Workflow Operating System
-                    </h3>
-                    <p className="text-sm text-zinc-300 leading-relaxed mb-4">
-                      OpenWorkflow is a full-stack platform for building, deploying, and monitoring AI-powered workflows.
-                      Design visual workflows with the drag-and-drop builder, orchestrate multiple AI agents, deploy across
-                      environments, and observe every execution with full tracing and logging.
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <Link href="/builder">
-                        <Button size="sm" className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white">
-                          <Workflow className="h-4 w-4 mr-2" />
-                          Open Builder
-                        </Button>
-                      </Link>
-                      <Link href="/dashboard">
-                        <Button size="sm" variant="outline" className="border-zinc-600 text-zinc-300 hover:text-white">
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          View Dashboard
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
+    <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {QUICK_STATS.map(stat => {
+          const Icon = stat.icon
+          return (
+            <Card key={stat.label} className="bg-zinc-900/80 border-zinc-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className={`h-4 w-4 ${stat.color}`} />
+                  <span className="text-xs text-zinc-500">{stat.label}</span>
                 </div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
               </CardContent>
             </Card>
+          )
+        })}
+      </div>
 
-            {/* Feature Sections */}
+      {/* Hero Section */}
+      <Card className="bg-gradient-to-br from-violet-950/50 to-cyan-950/50 border-violet-500/20">
+        <CardContent className="p-8">
+          <div className="flex items-start gap-6">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0">
+              <Cpu className="h-7 w-7 text-white" />
+            </div>
             <div>
-              <h3 className="text-lg font-semibold text-white mb-1">Platform Features</h3>
-              <p className="text-xs text-zinc-500 mb-4">Everything you need to build and run AI workflows at scale</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {FEATURES.map(feature => {
-                  const Icon = feature.icon
-                  return (
-                    <Link key={feature.label} href={feature.href}>
-                      <Card className="bg-zinc-900/80 border-zinc-800 hover:border-zinc-700 transition-all h-full cursor-pointer group">
-                        <CardContent className="p-5">
-                          <div className="flex items-start gap-3 mb-3">
-                            <div className={`h-9 w-9 rounded-lg border ${feature.border} ${feature.bg} flex items-center justify-center shrink-0`}>
-                              <Icon className={`h-4 w-4 ${feature.color}`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors flex items-center gap-1.5">
-                                {feature.label}
-                                <ArrowRight className="h-3 w-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-                              </h4>
-                            </div>
-                          </div>
-                          <p className="text-xs text-zinc-500 leading-relaxed mb-3">{feature.desc}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {feature.tags.map(tag => (
-                              <Badge key={tag} variant="outline" className="text-[9px] border-zinc-700 text-zinc-500">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  )
-                })}
+              <h3 className="text-xl font-bold text-white mb-2">
+                AI Workflow Operating System
+              </h3>
+              <p className="text-sm text-zinc-300 leading-relaxed mb-4">
+                OpenWorkflow is a full-stack platform for building, deploying, and monitoring AI-powered workflows.
+                Design visual workflows with the drag-and-drop builder, orchestrate multiple AI agents, deploy across
+                environments, and observe every execution with full tracing and logging.
+              </p>
+              <div className="flex items-center gap-3">
+                <Link href="/builder">
+                  <Button size="sm" className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white">
+                    <Workflow className="h-4 w-4 mr-2" />
+                    Open Builder
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button size="sm" variant="outline" className="border-zinc-600 text-zinc-300 hover:text-white">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    View Dashboard
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feature Sections */}
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-1">Platform Features</h3>
+        <p className="text-xs text-zinc-500 mb-4">Everything you need to build and run AI workflows at scale</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {FEATURES.map(feature => {
+            const Icon = feature.icon
+            return (
+              <Link key={feature.label} href={feature.href}>
+                <Card className="bg-zinc-900/80 border-zinc-800 hover:border-zinc-700 transition-all h-full cursor-pointer group">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={`h-9 w-9 rounded-lg border ${feature.border} ${feature.bg} flex items-center justify-center shrink-0`}>
+                        <Icon className={`h-4 w-4 ${feature.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors flex items-center gap-1.5">
+                          {feature.label}
+                          <ArrowRight className="h-3 w-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                        </h4>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-500 leading-relaxed mb-3">{feature.desc}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {feature.tags.map(tag => (
+                        <Badge key={tag} variant="outline" className="text-[9px] border-zinc-700 text-zinc-500">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Architecture Overview */}
+      <Card className="bg-zinc-900/80 border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-cyan-400" />
+            Technical Architecture
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <h4 className="text-xs font-semibold text-emerald-400 mb-3">Core Engine</h4>
+              <div className="space-y-2 text-xs text-zinc-400">
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Workflow Engine</strong> — DAG-based execution with conditional branching, parallel paths, and error recovery</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Agent Orchestrator</strong> — Multi-agent coordination with shared context and handoff protocols</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Deployment Manager</strong> — Environment promotion pipeline with version snapshots and rollback</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Plugin Registry</strong> — Dynamic plugin loading with custom nodes, integrations, and triggers</span>
+                </div>
               </div>
             </div>
 
-            {/* Architecture Overview */}
-            <Card className="bg-zinc-900/80 border-zinc-800">
-              <CardHeader>
-                <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-cyan-400" />
-                  Technical Architecture
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <h4 className="text-xs font-semibold text-emerald-400 mb-3">Core Engine</h4>
-                    <div className="space-y-2 text-xs text-zinc-400">
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Workflow Engine</strong> — DAG-based execution with conditional branching, parallel paths, and error recovery</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Agent Orchestrator</strong> — Multi-agent coordination with shared context and handoff protocols</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Deployment Manager</strong> — Environment promotion pipeline with version snapshots and rollback</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Plugin Registry</strong> — Dynamic plugin loading with custom nodes, integrations, and triggers</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-semibold text-violet-400 mb-3">Observability</h4>
-                    <div className="space-y-2 text-xs text-zinc-400">
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Distributed Tracer</strong> — OpenTelemetry-compatible span trees with token and cost tracking</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Structured Logger</strong> — Level-filtered logs with trace correlation and metadata</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Test Framework</strong> — Workflow test runner with assertions on output, status, and cost</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Audit Trail</strong> — Complete action log with user attribution and IP tracking</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-semibold text-cyan-400 mb-3">Data & Integrations</h4>
-                    <div className="space-y-2 text-xs text-zinc-400">
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Memory Layer</strong> — Customer context, knowledge notes, and sentiment tracking</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Trigger System</strong> — Webhook, schedule, email, voice call, WhatsApp, and form triggers</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">Notification Delivery</strong> — Multi-channel delivery with email, Slack, and webhooks</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                        <span><strong className="text-zinc-300">SSO & White-label</strong> — SAML/OIDC auth and customizable branding/embed</span>
-                      </div>
-                    </div>
-                  </div>
+            <div>
+              <h4 className="text-xs font-semibold text-violet-400 mb-3">Observability</h4>
+              <div className="space-y-2 text-xs text-zinc-400">
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Distributed Tracer</strong> — OpenTelemetry-compatible span trees with token and cost tracking</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Structured Logger</strong> — Level-filtered logs with trace correlation and metadata</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Test Framework</strong> — Workflow test runner with assertions on output, status, and cost</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Audit Trail</strong> — Complete action log with user attribution and IP tracking</span>
+                </div>
+              </div>
+            </div>
 
-            {/* Quick Links */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href="/builder">
-                <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                      <Workflow className="h-5 w-5 text-violet-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Workflow Builder</p>
-                      <p className="text-[10px] text-zinc-500">Visual drag-and-drop editor</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link href="/demo">
-                <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                      <Headphones className="h-5 w-5 text-cyan-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">AI Employee Demo</p>
-                      <p className="text-[10px] text-zinc-500">Watch AI agents in action</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link href="/audit">
-                <Card className="bg-zinc-900/80 border-zinc-800 hover:border-emerald-500/30 transition-colors cursor-pointer">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                      <Shield className="h-5 w-5 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Audit Trail</p>
-                      <p className="text-[10px] text-zinc-500">Complete action history</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+            <div>
+              <h4 className="text-xs font-semibold text-cyan-400 mb-3">Data & Integrations</h4>
+              <div className="space-y-2 text-xs text-zinc-400">
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Memory Layer</strong> — Customer context, knowledge notes, and sentiment tracking</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Trigger System</strong> — Webhook, schedule, email, voice call, WhatsApp, and form triggers</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">Notification Delivery</strong> — Multi-channel delivery with email, Slack, and webhooks</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                  <span><strong className="text-zinc-300">SSO & White-label</strong> — SAML/OIDC auth and customizable branding/embed</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Footer */}
-        <footer className="border-t border-zinc-800 bg-zinc-900/60 px-6 py-3 shrink-0">
-          <div className="max-w-6xl mx-auto text-center text-[10px] text-zinc-600">
-            OpenWorkflow — AI Workflow Operating System • Powered by Next.js 16, Prisma, Zustand, ReactFlow
-          </div>
-        </footer>
-      </main>
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/builder">
+          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                <Workflow className="h-5 w-5 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-200">Workflow Builder</p>
+                <p className="text-[10px] text-zinc-500">Visual drag-and-drop editor</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/demo">
+          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                <Headphones className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-200">AI Employee Demo</p>
+                <p className="text-[10px] text-zinc-500">Watch AI agents in action</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/audit">
+          <Card className="bg-zinc-900/80 border-zinc-800 hover:border-emerald-500/30 transition-colors cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-200">Audit Trail</p>
+                <p className="text-[10px] text-zinc-500">Complete action history</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
     </div>
   )
 }

@@ -107,11 +107,6 @@ export async function proxy(request: NextRequest) {
   return handleRequest(request)
 }
 
-// Keep middleware export for backward compatibility
-export async function middleware(request: NextRequest) {
-  return handleRequest(request)
-}
-
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|logo.svg|robots.txt).*)",

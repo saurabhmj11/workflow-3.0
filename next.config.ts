@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
     ".space-z.ai",
     "localhost",
   ],
+  turbopack: {
+    root: "/home/z/my-project",
+  },
 };
 
 export default nextConfig;

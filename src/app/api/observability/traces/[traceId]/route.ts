@@ -26,7 +26,7 @@ export async function GET(
     }
 
     function buildSpanTree(span: typeof trace.spans[0]): SpanNode {
-      const children = trace.spans.filter(s => s.parentId === span.id)
+      const children = trace!.spans.filter(s => s.parentId === span.id)
       return {
         span,
         children: children.map(buildSpanTree),

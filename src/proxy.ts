@@ -1,7 +1,59 @@
 import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import type { NextRequest } from "next/server"
-import { checkRateLimit, getRateLimitKey, RATE_LIMITS, type RateLimitConfig } from "@/lib/rate-limit"
+
+// ─── Inline Rate Limiting (Edge-compatible) ──────────
+// Cannot import @/lib/rate-limit because it imports PrismaClient
+// which is incompatible with the Edge Runtime that proxy.ts runs in.
+
+interface RateLimitConfig {
+  limit: number
+  windowMs: number
+}
+
+interface RateLimitEntry {
+  count: number
+  resetTime: number
+}
+
+const RATE_LIMITS: Record<string, RateLimitConfig> = {
+  api: { limit: 100, windowMs: 60_000 },
+  auth: { limit: 10, windowMs: 60_000 },
+  ai: { limit: 20, windowMs: 60_000 },
+  webhook: { limit: 60, windowMs: 60_000 },
+}
+
+const memoryStore = new Map<string, RateLimitEntry>()
+
+function checkRateLimit(key: string, config: RateLimitConfig) {
+  const now = Date.now()
+  const entry = memoryStore.get(key)
+
+  if (!entry || now > entry.resetTime) {
+    memoryStore.set(key, { count: 1, resetTime: now + config.windowMs })
+    return { allowed: true, remaining: config.limit - 1, resetTime: now + config.windowMs }
+  }
+
+  if (entry.count >= config.limit) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetTime: entry.resetTime,
+      retryAfter: Math.ceil((entry.resetTime - now) / 1000),
+    }
+  }
+
+  entry.count++
+  return { allowed: true, remaining: config.limit - entry.count, resetTime: entry.resetTime }
+}
+
+function getRateLimitKey(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) return `ip:${forwarded.split(',')[0].trim()}`
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) return `ip:${realIp.trim()}`
+  return 'ip:unknown'
+}
 
 // ─── Proxy (Next.js 16) ─────────────────────────────
 // 1. Rate limiting (before auth — works even for unauthenticated requests)
@@ -14,7 +66,7 @@ async function handleRequest(request: NextRequest) {
 
   // ─── Rate Limiting (BEFORE auth) ──────────────────
   if (pathname.startsWith("/api/")) {
-    let rateLimitConfig: RateLimitConfig = RATE_LIMITS.api // default: general API
+    let rateLimitConfig: RateLimitConfig = RATE_LIMITS.api
 
     if (pathname.startsWith("/api/auth")) {
       rateLimitConfig = RATE_LIMITS.auth

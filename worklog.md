@@ -201,3 +201,29 @@ Stage Summary:
 - Builder, Demo, Login, Register pages excluded from layout (full-screen)
 - Mobile responsive: sidebar slides in as overlay on small screens
 - Test coverage: 267 tests passing across 11 test files
+
+---
+Task ID: fix-launch-app
+Agent: Main Agent
+Task: Fix all issues preventing the app from launching and make preview visible
+
+Work Log:
+- Diagnosed middleware.ts / proxy.ts conflict (Next.js 16 only allows proxy.ts)
+- Removed middleware.ts and middleware.ts.bak
+- Removed duplicate `middleware` export from proxy.ts
+- Discovered proxy.ts was importing @/lib/rate-limit which imports PrismaClient - INCOMPATIBLE with Edge Runtime
+- Rewrote proxy.ts with inline edge-compatible rate limiting (no Prisma dependency)
+- Removed `output: "standalone"` from next.config.ts (caused issues with next start)
+- Updated package.json scripts: simplified build script, updated start script
+- Updated start-server.sh to use `next start` (production mode) instead of `next dev`
+- Clean rebuilt the project successfully
+- All 80+ API routes and 15 page routes compile and serve correctly
+- Server stable at ~90MB memory in production mode
+
+Stage Summary:
+- Root cause: proxy.ts imported PrismaClient (via rate-limit.ts) which crashes Edge Runtime
+- Fixed by implementing inline rate limiting in proxy.ts without any Node.js-only imports
+- Also fixed middleware/proxy conflict, removed standalone output mode
+- Production server works perfectly on port 3000
+- Key files modified: src/proxy.ts, next.config.ts, package.json, start-server.sh
+- Key files removed: src/middleware.ts, src/middleware.ts.bak

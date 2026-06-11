@@ -72,7 +72,7 @@ async function handleRequest(request: NextRequest) {
       rateLimitConfig = RATE_LIMITS.auth
     } else if (pathname.startsWith("/api/ai")) {
       rateLimitConfig = RATE_LIMITS.ai
-    } else if (pathname.match(/^\/api\/triggers\/webhook\/[^/]+$/)) {
+    } else if (pathname.match(/^\/api\/triggers\/(webhook|voice-call|whatsapp|form|email)/)) {
       rateLimitConfig = RATE_LIMITS.webhook
     }
 
@@ -116,13 +116,40 @@ async function handleRequest(request: NextRequest) {
   }
 
   // ─── Public API routes (no auth required) ──────────
-  const publicApiPrefixes = ["/api/auth", "/api/ai/completions"]
+  // These are intentionally accessible without authentication:
+  // - /api/auth: NextAuth.js endpoints (login, session, etc.)
+  // - /api/waitlist: Public signup form
+  // - /api/triggers/*: Webhook endpoints that external services call
+  // - /api/sso/*: SSO callback endpoints
+  // - /api/f/*: Public form submissions
+  // - /api/health: Health check for monitoring
+  const publicApiPrefixes = [
+    "/api/auth",
+    "/api/waitlist",
+    "/api/health",
+    "/api/sso",
+    "/api/triggers/webhook",
+    "/api/triggers/voice-call/webhook",
+    "/api/triggers/whatsapp/webhook",
+    "/api/triggers/form",
+  ]
   if (publicApiPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next()
   }
 
   // ─── Protected pages ───────────────────────────────
-  const protectedPagePrefixes = ["/dashboard", "/memory"]
+  const protectedPagePrefixes = [
+    "/dashboard",
+    "/memory",
+    "/analytics",
+    "/observability",
+    "/settings",
+    "/audit",
+    "/deployments",
+    "/testing",
+    "/integrations",
+    "/plugins",
+  ]
   if (protectedPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
     if (!token) {
@@ -132,12 +159,34 @@ async function handleRequest(request: NextRequest) {
   }
 
   // ─── Protected API routes ──────────────────────────
+  // All management/api routes require authentication except
+  // the explicitly public ones above
   const protectedApiPrefixes = [
     "/api/workflows",
     "/api/executions",
     "/api/memory",
     "/api/integrations",
     "/api/copilot",
+    "/api/ai/completions",
+    "/api/analytics",
+    "/api/audit",
+    "/api/deployments",
+    "/api/notifications",
+    "/api/settings",
+    "/api/mcp",
+    "/api/agents",
+    "/api/approvals",
+    "/api/plugins",
+    "/api/whitelabel",
+    "/api/collaboration",
+    "/api/observability",
+    "/api/testing",
+    "/api/triggers/schedule",
+    "/api/triggers/email",
+    "/api/triggers/logs",
+    "/api/triggers/webhook",   // Management endpoints (create/list)
+    "/api/triggers/voice-call", // Management endpoints
+    "/api/triggers/whatsapp",   // Management endpoints
   ]
   if (protectedApiPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })

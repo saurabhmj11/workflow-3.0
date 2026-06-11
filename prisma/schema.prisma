@@ -111,6 +111,9 @@ model Workflow {
   whatsAppTriggers  WhatsAppTrigger[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 model XmlNode {
@@ -153,6 +156,10 @@ model Execution {
   workflow        Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   startedAt       DateTime   @default(now())
   finishedAt      DateTime?
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
 }
 
 model MCPServer {
@@ -304,6 +311,10 @@ model ApprovalRecord {
   slaDeadline  DateTime?
   createdAt    DateTime  @default(now())
   resolvedAt   DateTime?
+
+  @@index([runId])
+  @@index([workflowId])
+  @@index([status])
 }
 
 // ─── Integration Credentials ─────────────────────
@@ -440,6 +451,10 @@ model TriggerLog {
   error       String?
   duration    Int?     // Processing time in ms
   createdAt   DateTime @default(now())
+
+  @@index([triggerType])
+  @@index([workflowId])
+  @@index([createdAt])
 }
 
 // ─── Audit Trail ──────────────────────────────────
@@ -548,6 +563,9 @@ model Deployment {
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([environmentId])
 }
 
 // ─── SSO / SAML Configuration ────────────────────

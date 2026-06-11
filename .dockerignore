@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+.next
+out
+
+# Environment & secrets
+.env
+.env*.local
+
+# Database
+db/*.db
+db/*.db-journal
+
+# Development files
+agent-ctx
+download
+upload
+dev.log
+server.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# Git
+.git
+.gitignore
+
+# Docs & misc
+*.md
+!README.md
+watchdog.sh
+run-server.sh
+start-server.sh
+server-wrapper.js
+scripts/

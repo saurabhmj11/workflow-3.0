@@ -41,16 +41,25 @@ interface ActiveListener {
 
 // ─── Simple encryption for passwords ────────────
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'openworkflow-default-key-change-in-production-32bytes'
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY
+if (!ENCRYPTION_KEY) {
+  log.warn('ENCRYPTION_KEY not set — email password encryption is DISABLED. Set ENCRYPTION_KEY in production!')
+}
 
 export function encryptPassword(text: string): string {
+  if (!ENCRYPTION_KEY) {
+    // No encryption key available — store as base64 (insecure, development only)
+    log.warn('Encrypting without ENCRYPTION_KEY — password stored as base64 (insecure)')
+    return Buffer.from(text).toString('base64')
+  }
   try {
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+    const salt = crypto.randomBytes(16)
+    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32)
     const iv = crypto.randomBytes(16)
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
     let encrypted = cipher.update(text, 'utf8', 'hex')
     encrypted += cipher.final('hex')
-    return iv.toString('hex') + ':' + encrypted
+    return salt.toString('hex') + ':' + iv.toString('hex') + ':' + encrypted
   } catch {
     // Fallback: store as base64 (not ideal but functional)
     return Buffer.from(text).toString('base64')
@@ -60,17 +69,32 @@ export function encryptPassword(text: string): string {
 export function decryptPassword(encrypted: string): string {
   try {
     const parts = encrypted.split(':')
-    if (parts.length !== 2) {
-      // Assume base64 fallback
-      return Buffer.from(encrypted, 'base64').toString('utf8')
+    // New format: salt:iv:ciphertext (3 parts)
+    if (parts.length === 3) {
+      if (!ENCRYPTION_KEY) {
+        throw new Error('ENCRYPTION_KEY not set — cannot decrypt password')
+      }
+      const salt = Buffer.from(parts[0], 'hex')
+      const iv = Buffer.from(parts[1], 'hex')
+      const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32)
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+      let decrypted = decipher.update(parts[2], 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+      return decrypted
     }
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
-    const iv = Buffer.from(parts[0], 'hex')
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
-    let decrypted = decipher.update(parts[1], 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
-  } catch {
+    // Legacy format: iv:ciphertext (2 parts, static salt)
+    if (parts.length === 2) {
+      if (!ENCRYPTION_KEY) {
+        throw new Error('ENCRYPTION_KEY not set — cannot decrypt password')
+      }
+      const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+      const iv = Buffer.from(parts[0], 'hex')
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+      let decrypted = decipher.update(parts[1], 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+      return decrypted
+    }
+  } catch (err) {
     // Fallback: try base64
     try {
       return Buffer.from(encrypted, 'base64').toString('utf8')

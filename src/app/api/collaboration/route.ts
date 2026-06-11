@@ -24,32 +24,36 @@ export async function GET(request: Request) {
     })
   }
 
+  // Non-null assertions are safe here because we checked above
+  const wfId = workflowId
+  const uId = userId
+
   const clientId = `collab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-  const userColor = collabManager.getUserColor(userId)
+  const userColor = collabManager.getUserColor(uId)
 
   const stream = new ReadableStream({
     start(controller) {
       // Send initial connection event with user info
       const connectMsg = `event: connected\ndata: ${JSON.stringify({
         clientId,
-        userId,
+        userId: uId,
         color: userColor,
         timestamp: Date.now(),
-        users: collabManager.getRoomUsers(workflowId),
+        users: collabManager.getRoomUsers(wfId),
       })}\n\n`
       controller.enqueue(new TextEncoder().encode(connectMsg))
 
       // Register the SSE client
       collabManager.registerClient({
         id: clientId,
-        userId,
-        workflowId,
+        userId: uId,
+        workflowId: wfId,
         controller,
       })
 
       // Join the room
-      collabManager.joinRoom(workflowId, {
-        id: userId,
+      collabManager.joinRoom(wfId, {
+        id: uId,
         name: userName,
         color: userColor,
         lastActive: Date.now(),
@@ -68,9 +72,9 @@ export async function GET(request: Request) {
       // Cleanup on close
       function cleanup() {
         clearInterval(heartbeat)
-        collabManager.leaveRoom(workflowId, userId)
+        collabManager.leaveRoom(wfId, uId)
         collabManager.removeClient(clientId)
-        log.info({ clientId, userId, workflowId }, 'SSE connection closed')
+        log.info({ clientId, userId: uId, workflowId: wfId }, 'SSE connection closed')
       }
 
       // Handle abort signal

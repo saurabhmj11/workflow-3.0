@@ -160,7 +160,7 @@ ${edgeSummary || '  (no connections)'}
 Use this context to give specific, tailored advice about their current workflow. Reference specific nodes by name when making suggestions. If you notice issues (missing error handling, no confidence routing, disconnected nodes), proactively suggest fixes.`;
 }
 
-async function handlePost(request: NextRequest) {
+async function handlePost(request: Request) {
   try {
     const body = await request.json() as CopilotRequestBody;
     const { messages = [], workflowContext } = body;
@@ -179,7 +179,7 @@ async function handlePost(request: NextRequest) {
     }
 
     // Prepare messages for the AI
-    const aiMessages = [
+    const aiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },
       ...messages.map((m: CopilotMessage) => ({
         role: m.role as 'user' | 'assistant',

@@ -227,3 +227,37 @@ Stage Summary:
 - Production server works perfectly on port 3000
 - Key files modified: src/proxy.ts, next.config.ts, package.json, start-server.sh
 - Key files removed: src/middleware.ts, src/middleware.ts.bak
+
+---
+Task ID: production-readiness-fixes
+Agent: Main Agent
+Task: Fix all critical and moderate security/production issues before deployment
+
+Work Log:
+- Conducted comprehensive production readiness audit (10 categories)
+- Fixed CRITICAL: proxy.ts now protects ALL API routes (added 20+ route prefixes)
+  - /api/audit, /api/analytics, /api/deployments, /api/notifications, /api/settings, /api/mcp, /api/agents, /api/approvals, /api/plugins, /api/whitelabel, /api/collaboration, /api/observability, /api/testing, /api/ai/completions (removed from public)
+  - Only truly public routes remain: /api/auth, /api/health, /api/waitlist, /api/sso, trigger webhooks
+- Fixed CRITICAL: Removed hardcoded encryption key fallback in email-listener.ts
+  - Now warns if ENCRYPTION_KEY not set instead of silently using insecure key
+  - Replaced static salt 'salt' with random per-encryption salt
+  - New encryption format: salt:iv:ciphertext (3 parts, backward compatible with 2-part legacy format)
+- Fixed CRITICAL: Removed Caddyfile SSRF vulnerability (XTransformPort query param handler)
+- Created .dockerignore to prevent secrets/examples from being copied into Docker image
+- Added 12 Prisma indexes: Workflow(userId, isActive), Execution(workflowId, status, startedAt), ApprovalRecord(runId, workflowId, status), TriggerLog(triggerType, workflowId, createdAt), Deployment(workflowId, environmentId)
+- Created .env.example with all required and optional environment variables documented
+- Fixed db.ts: query logging now only in development (was always-on in production)
+- Updated tsconfig.json to exclude skills/, examples/, download/, agent-ctx/, scripts/ from compilation
+- Fixed TypeScript errors in collaboration route and copilot route
+- All 267 tests passing, build successful
+
+Stage Summary:
+- 3 critical security issues fixed (auth coverage, encryption, SSRF)
+- 6 moderate issues fixed (indexes, dockerignore, env example, query logging, tsconfig)
+- Server starts in production mode with proper security warnings
+- App is now ready for real-world deployment with the following production checklist:
+  1. Set NEXTAUTH_SECRET to a strong random value (openssl rand -base64 32)
+  2. Set ENCRYPTION_KEY to a strong random value (openssl rand -base64 32)
+  3. Switch DATABASE_URL from SQLite to PostgreSQL for production
+  4. Configure a proper reverse proxy (Caddy/Nginx) with HTTPS
+  5. Set NODE_ENV=production

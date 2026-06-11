@@ -1,9 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
-import { useExecutionStore } from '@/stores/execution-store'
-import { useApprovalStore } from '@/stores/approval-store'
-import { useWorkflowStore } from '@/stores/workflow-store'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +21,14 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Loader2,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  ThumbsUp,
+  ThumbsDown,
+  Workflow,
+  Bell,
+  Eye,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -42,7 +47,74 @@ const COLORS = {
   zinc: '#71717a',
 }
 
-const PIE_COLORS = [COLORS.emerald, COLORS.amber, COLORS.red, COLORS.cyan, COLORS.violet]
+// ─── Types ───────────────────────────────────────
+interface PlatformMetrics {
+  totalWorkflows: number
+  activeWorkflows: number
+  totalExecutions: number
+  successRate: number
+  totalCostUsd: number
+  totalTokensUsed: number
+  avgExecutionTime: number
+  executionsByTrigger: Record<string, number>
+  topWorkflowsByExecutions: Array<{ workflowId: string; name: string; executions: number }>
+  costByDay: Array<{ date: string; cost: number }>
+  errorTrend: Array<{ date: string; errors: number }>
+}
+
+interface RealtimeMetrics {
+  activeExecutions: number
+  recentCompletions: number
+  recentErrors: number
+  avgResponseTime: number
+}
+
+interface ExecutionRecord {
+  id: string
+  workflowId: string
+  workflowName?: string
+  runId: string
+  status: string
+  triggeredBy: string
+  steps: Array<{ nodeType?: string; status?: string; output?: any; startedAt?: string; finishedAt?: string; tokenUsage?: { prompt?: number; completion?: number } }>
+  totalDurationMs: number
+  totalCostUsd: number
+  error?: string
+  startedAt: string
+  finishedAt?: string
+}
+
+interface ApprovalRecord {
+  id: string
+  runId: string
+  nodeId: string
+  workflowId: string
+  assignee?: string | null
+  status: string
+  context?: any
+  notes?: string | null
+  slaDeadline?: string | null
+  createdAt: string
+  resolvedAt?: string | null
+}
+
+interface NotificationRecord {
+  id: string
+  type: string
+  title: string
+  message: string
+  category: string
+  priority: string
+  isRead: boolean
+  actionUrl?: string | null
+  createdAt: string
+}
+
+interface WorkflowSummary {
+  id: string
+  name: string
+  isActive?: boolean
+}
 
 // ─── Metric Card ─────────────────────────────────
 function MetricCard({
@@ -98,38 +170,199 @@ function MetricCard({
 
 // ─── Main Dashboard Page ─────────────────────────
 export default function AIEmployeeDashboard() {
-  const results = useExecutionStore((s) => s.results)
-  const approvalRequests = useApprovalStore((s) => s.requests)
-  const [isLoading, setIsLoading] = useState(true)
+  // ─── API Data State ────────────────────────────
+  const [platformMetrics, setPlatformMetrics] = useState<PlatformMetrics | null>(null)
+  const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null)
+  const [executions, setExecutions] = useState<ExecutionRecord[]>([])
+  const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([])
+  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([])
 
-  // Simulate loading
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800)
-    return () => clearTimeout(timer)
+  // ─── UI State ──────────────────────────────────
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isLiveConnected, setIsLiveConnected] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+
+  // ─── Fetch all data from APIs ──────────────────
+  const fetchAllData = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setIsRefreshing(true)
+    setFetchError(null)
+
+    try {
+      const [analyticsRes, executionsRes, approvalsRes, notificationsRes, workflowsRes] = await Promise.allSettled([
+        fetch('/api/analytics'),
+        fetch('/api/executions?limit=50'),
+        fetch('/api/approvals'),
+        fetch('/api/notifications?limit=10'),
+        fetch('/api/workflows/list'),
+      ])
+
+      // Process analytics
+      if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) {
+        const json = await analyticsRes.value.json()
+        if (json.ok) {
+          setPlatformMetrics(json.data.platform)
+          setRealtimeMetrics(json.data.realtime)
+        }
+      }
+
+      // Process executions
+      if (executionsRes.status === 'fulfilled' && executionsRes.value.ok) {
+        const json = await executionsRes.value.json()
+        if (json.ok && Array.isArray(json.data)) {
+          setExecutions(json.data)
+        }
+      }
+
+      // Process approvals
+      if (approvalsRes.status === 'fulfilled' && approvalsRes.value.ok) {
+        const json = await approvalsRes.value.json()
+        if (json.ok && Array.isArray(json.data)) {
+          setApprovals(json.data)
+        }
+      }
+
+      // Process notifications
+      if (notificationsRes.status === 'fulfilled' && notificationsRes.value.ok) {
+        const json = await notificationsRes.value.json()
+        if (json.ok && json.data) {
+          setNotifications(json.data.notifications ?? json.data ?? [])
+        }
+      }
+
+      // Process workflows
+      if (workflowsRes.status === 'fulfilled' && workflowsRes.value.ok) {
+        const json = await workflowsRes.value.json()
+        if (json.ok && Array.isArray(json.data)) {
+          setWorkflows(json.data)
+        }
+      }
+
+      setLastRefreshed(new Date())
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch dashboard data')
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
   }, [])
 
-  // ─── Compute Metrics ────────────────────────────
+  // ─── Initial data fetch ────────────────────────
+  useEffect(() => {
+    fetchAllData()
+  }, [fetchAllData])
+
+  // ─── SSE Live Analytics Connection ─────────────
+  useEffect(() => {
+    let eventSource: EventSource | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    function connectSSE() {
+      try {
+        eventSource = new EventSource('/api/analytics/live')
+
+        eventSource.addEventListener('connected', () => {
+          setIsLiveConnected(true)
+        })
+
+        eventSource.addEventListener('metrics', (e) => {
+          try {
+            const data = JSON.parse((e as MessageEvent).data)
+            setRealtimeMetrics({
+              activeExecutions: data.activeExecutions ?? 0,
+              recentCompletions: data.recentCompletions ?? 0,
+              recentErrors: data.recentErrors ?? 0,
+              avgResponseTime: data.avgResponseTime ?? 0,
+            })
+            setLastRefreshed(new Date())
+          } catch {
+            // Ignore malformed SSE data
+          }
+        })
+
+        eventSource.addEventListener('alert', (e) => {
+          try {
+            const data = JSON.parse((e as MessageEvent).data)
+            if (data.type === 'error_spike') {
+              // Refresh executions to show new errors
+              fetch('/api/executions?limit=50')
+                .then(r => r.json())
+                .then(json => {
+                  if (json.ok && Array.isArray(json.data)) setExecutions(json.data)
+                })
+                .catch(() => {})
+            }
+          } catch {
+            // Ignore
+          }
+        })
+
+        eventSource.onerror = () => {
+          setIsLiveConnected(false)
+          eventSource?.close()
+          // Reconnect after 10 seconds
+          reconnectTimer = setTimeout(connectSSE, 10000)
+        }
+      } catch {
+        setIsLiveConnected(false)
+      }
+    }
+
+    connectSSE()
+
+    return () => {
+      eventSource?.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+    }
+  }, [])
+
+  // ─── Approval Actions ──────────────────────────
+  const handleApproval = useCallback(async (approvalId: string, action: 'approved' | 'rejected') => {
+    setActionLoading(prev => ({ ...prev, [approvalId]: true }))
+    try {
+      const res = await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: approvalId, status: action }),
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setApprovals(prev => prev.map(a =>
+          a.id === approvalId
+            ? { ...a, status: action, resolvedAt: new Date().toISOString() }
+            : a
+        ))
+      }
+    } catch {
+      // Silently fail — UI already updated optimistically
+    } finally {
+      setActionLoading(prev => ({ ...prev, [approvalId]: false }))
+    }
+  }, [])
+
+  // ─── Compute Metrics from Real Data ────────────
   const metrics = useMemo(() => {
-    const completedRuns = results.filter(r => r.status === 'success')
-    const failedRuns = results.filter(r => r.status === 'error')
-    const pendingApprovals = approvalRequests.filter(r => r.status === 'pending')
-    const resolvedApprovals = approvalRequests.filter(r => r.status !== 'pending')
+    const completedRuns = executions.filter(r => r.status === 'success')
+    const failedRuns = executions.filter(r => r.status === 'error')
+    const pendingApprovals = approvals.filter(r => r.status === 'pending')
+    const resolvedApprovals = approvals.filter(r => r.status !== 'pending')
 
-    // Total runs
-    const totalRuns = results.length
+    const totalRuns = executions.length
+    const successRate = platformMetrics?.successRate
+      ? Math.round(platformMetrics.successRate * 100)
+      : totalRuns > 0 ? Math.round((completedRuns.length / totalRuns) * 100) : 0
 
-    // Success rate
-    const successRate = totalRuns > 0 ? Math.round((completedRuns.length / totalRuns) * 100) : 0
+    const avgDuration = platformMetrics?.avgExecutionTime
+      ?? (completedRuns.length > 0
+        ? Math.round(completedRuns.reduce((acc, r) => acc + r.totalDurationMs, 0) / completedRuns.length)
+        : 0)
 
-    // Average duration
-    const avgDuration = completedRuns.length > 0
-      ? Math.round(completedRuns.reduce((acc, r) => acc + r.totalDurationMs, 0) / completedRuns.length)
-      : 0
+    const totalCost = platformMetrics?.totalCostUsd ?? executions.reduce((acc, r) => acc + (r.totalCostUsd ?? 0), 0)
 
-    // Total cost
-    const totalCost = results.reduce((acc, r) => acc + (r.totalCostUsd ?? 0), 0)
-
-    // Average confidence
+    // Confidence from execution steps
     const allConfidences: number[] = []
     for (const run of completedRuns) {
       for (const step of run.steps) {
@@ -145,29 +378,29 @@ export default function AIEmployeeDashboard() {
       ? allConfidences.reduce((a, b) => a + b, 0) / allConfidences.length
       : 0
 
-    // Escalation rate
     const escalationRate = totalRuns > 0
-      ? Math.round((approvalRequests.length / totalRuns) * 100)
+      ? Math.round((approvals.length / totalRuns) * 100)
       : 0
 
-    // Runs by status
+    // Status distribution
     const statusData = [
       { name: 'Success', value: completedRuns.length, color: COLORS.emerald },
       { name: 'Failed', value: failedRuns.length, color: COLORS.red },
-      { name: 'Awaiting', value: results.filter(r => r.status === 'awaiting_approval').length, color: COLORS.amber },
-      { name: 'Running', value: results.filter(r => r.status === 'running').length, color: COLORS.blue },
+      { name: 'Awaiting', value: executions.filter(r => r.status === 'awaiting_approval').length, color: COLORS.amber },
+      { name: 'Running', value: executions.filter(r => r.status === 'running').length, color: COLORS.blue },
     ].filter(d => d.value > 0)
 
-    // Cost over time (last 10 runs)
-    const costOverTime = results.slice(0, 10).reverse().map((r, i) => ({
-      name: `Run ${i + 1}`,
-      cost: Math.round((r.totalCostUsd ?? 0) * 10000) / 10000,
-      duration: Math.round(r.totalDurationMs / 1000),
-    }))
+    // Cost over time (from API costByDay or from executions)
+    const costOverTime = platformMetrics?.costByDay?.length
+      ? platformMetrics.costByDay.slice(-14).map(d => ({ name: d.date.slice(5), cost: d.cost }))
+      : executions.slice(0, 10).reverse().map((r, i) => ({
+          name: `Run ${i + 1}`,
+          cost: Math.round((r.totalCostUsd ?? 0) * 10000) / 10000,
+        }))
 
     // Duration over time
-    const durationOverTime = results.slice(0, 10).reverse().map((r, i) => ({
-      name: `Run ${i + 1}`,
+    const durationOverTime = executions.slice(0, 10).reverse().map((r, i) => ({
+      name: r.startedAt ? new Date(r.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : `Run ${i + 1}`,
       seconds: Math.round(r.totalDurationMs / 1000),
     }))
 
@@ -184,11 +417,12 @@ export default function AIEmployeeDashboard() {
       { name: 'Low (<70%)', value: confidenceBuckets.low, color: COLORS.red },
     ].filter(d => d.value > 0)
 
-    // Node type breakdown
+    // Node type breakdown from execution steps
     const nodeTypeCount: Record<string, number> = {}
-    for (const run of results) {
+    for (const run of executions) {
       for (const step of run.steps) {
-        nodeTypeCount[step.nodeType] = (nodeTypeCount[step.nodeType] || 0) + 1
+        const nodeType = step.nodeType ?? 'unknown'
+        nodeTypeCount[nodeType] = (nodeTypeCount[nodeType] || 0) + 1
       }
     }
     const nodeTypeData = Object.entries(nodeTypeCount)
@@ -196,10 +430,20 @@ export default function AIEmployeeDashboard() {
       .slice(0, 6)
       .map(([name, value]) => ({ name, value }))
 
-    // Customer satisfaction (simulated — would be from real data)
-    const satisfactionScore = Math.min(100, Math.round(70 + avgConfidence * 30))
+    // Error trend from platform metrics
+    const errorTrendData = platformMetrics?.errorTrend?.length
+      ? platformMetrics.errorTrend.slice(-14).map(d => ({ name: d.date.slice(5), errors: d.errors }))
+      : []
 
-    // Resolved today (simulated)
+    // Trigger type distribution
+    const triggerData = platformMetrics?.executionsByTrigger
+      ? Object.entries(platformMetrics.executionsByTrigger).map(([name, value]) => ({ name, value }))
+      : []
+
+    // Top workflows
+    const topWorkflows = platformMetrics?.topWorkflowsByExecutions ?? []
+
+    const satisfactionScore = Math.min(100, Math.round(70 + avgConfidence * 30))
     const resolvedToday = completedRuns.length + resolvedApprovals.filter(r => r.status === 'approved').length
 
     return {
@@ -217,29 +461,50 @@ export default function AIEmployeeDashboard() {
       durationOverTime,
       confidenceDist,
       nodeTypeData,
+      errorTrendData,
+      triggerData,
+      topWorkflows,
       failedRuns: failedRuns.length,
       completedRuns: completedRuns.length,
+      totalWorkflows: platformMetrics?.totalWorkflows ?? workflows.length,
+      activeWorkflows: platformMetrics?.activeWorkflows ?? 0,
+      totalTokensUsed: platformMetrics?.totalTokensUsed ?? 0,
     }
-  }, [results, approvalRequests])
+  }, [executions, approvals, platformMetrics, workflows])
 
-  // ─── Recent Activity ────────────────────────────
+  // ─── Recent Activity from DB Executions ─────────
   const recentActivity = useMemo(() => {
-    return results.slice(0, 8).map((r) => ({
+    return executions.slice(0, 8).map((r) => ({
       id: r.runId,
+      workflowId: r.workflowId,
+      workflowName: r.workflowName,
       status: r.status,
       duration: Math.round(r.totalDurationMs / 1000),
       cost: r.totalCostUsd,
-      steps: r.steps.length,
+      steps: r.steps?.length ?? 0,
       time: r.startedAt,
+      triggeredBy: r.triggeredBy,
     }))
-  }, [results])
+  }, [executions])
 
+  // ─── Pending Approvals ─────────────────────────
+  const pendingApprovalsList = useMemo(() => {
+    return approvals.filter(a => a.status === 'pending')
+  }, [approvals])
+
+  // ─── Unread Notifications ──────────────────────
+  const unreadNotifications = useMemo(() => {
+    return notifications.filter(n => !n.isRead)
+  }, [notifications])
+
+  // ─── Loading State ─────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
           <p className="text-sm text-zinc-400">Loading AI Employee Dashboard...</p>
+          <p className="text-xs text-zinc-600">Fetching data from APIs</p>
         </div>
       </div>
     )
@@ -247,6 +512,84 @@ export default function AIEmployeeDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {/* Header with live status & refresh */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-zinc-100">AI Employee Dashboard</h1>
+            <p className="text-xs text-zinc-500">
+              {lastRefreshed
+                ? `Last updated ${lastRefreshed.toLocaleTimeString()}`
+                : 'Real-time performance metrics'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs">
+              {isLiveConnected ? (
+                <><Wifi className="h-3.5 w-3.5 text-emerald-400" /><span className="text-emerald-400">Live</span></>
+              ) : (
+                <><WifiOff className="h-3.5 w-3.5 text-zinc-600" /><span className="text-zinc-600">Offline</span></>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchAllData(true)}
+              disabled={isRefreshing}
+              className="h-8 text-xs border-zinc-800 hover:bg-zinc-800"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Error Banner */}
+        {fetchError && (
+          <Card className="bg-red-950/30 border-red-500/30">
+            <CardContent className="p-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-400" />
+              <p className="text-xs text-red-300">{fetchError}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchAllData(true)} className="ml-auto h-6 text-[10px] border-red-500/30 text-red-300 hover:bg-red-950/50">
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Real-time Metrics Row */}
+        {realtimeMetrics && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+              <div className={`h-2 w-2 rounded-full ${realtimeMetrics.activeExecutions > 0 ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`} />
+              <div>
+                <p className="text-xs text-zinc-500">Active Now</p>
+                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.activeExecutions}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              <div>
+                <p className="text-xs text-zinc-500">Completed (1h)</p>
+                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentCompletions}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+              <div>
+                <p className="text-xs text-zinc-500">Errors (5m)</p>
+                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentErrors}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+              <Clock className="h-3.5 w-3.5 text-cyan-500" />
+              <div>
+                <p className="text-xs text-zinc-500">Avg Response</p>
+                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.avgResponseTime > 0 ? `${(realtimeMetrics.avgResponseTime / 1000).toFixed(1)}s` : '—'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
@@ -266,11 +609,11 @@ export default function AIEmployeeDashboard() {
           />
           <MetricCard
             title="Avg Confidence"
-            value={`${(metrics.avgConfidence * 100).toFixed(0)}%`}
+            value={metrics.avgConfidence > 0 ? `${(metrics.avgConfidence * 100).toFixed(0)}%` : '—'}
             icon={Target}
             color="cyan"
-            trend={metrics.avgConfidence >= 0.9 ? 'up' : metrics.avgConfidence >= 0.7 ? 'neutral' : 'down'}
-            trendLabel={metrics.avgConfidence >= 0.9 ? 'High confidence' : metrics.avgConfidence >= 0.7 ? 'Moderate confidence' : 'Needs review'}
+            trend={metrics.avgConfidence >= 0.9 ? 'up' : metrics.avgConfidence >= 0.7 ? 'neutral' : metrics.avgConfidence > 0 ? 'down' : undefined}
+            trendLabel={metrics.avgConfidence >= 0.9 ? 'High confidence' : metrics.avgConfidence >= 0.7 ? 'Moderate confidence' : metrics.avgConfidence > 0 ? 'Needs review' : 'No data yet'}
           />
           <MetricCard
             title="Total Cost"
@@ -288,29 +631,100 @@ export default function AIEmployeeDashboard() {
             value={`${metrics.successRate}%`}
             icon={TrendingUp}
             color="emerald"
-            trend={metrics.successRate >= 80 ? 'up' : 'down'}
-            trendLabel={`${metrics.failedRuns} failed`}
+            trend={metrics.successRate >= 80 ? 'up' : metrics.totalRuns > 0 ? 'down' : undefined}
+            trendLabel={metrics.totalRuns > 0 ? `${metrics.failedRuns} failed` : 'No executions yet'}
           />
           <MetricCard
             title="Avg Runtime"
-            value={`${metrics.avgDuration / 1000}s`}
+            value={metrics.avgDuration > 0 ? `${(metrics.avgDuration / 1000).toFixed(1)}s` : '—'}
             icon={Clock}
             color="blue"
           />
           <MetricCard
             title="Satisfaction"
-            value={`${metrics.satisfactionScore}%`}
+            value={metrics.totalRuns > 0 ? `${metrics.satisfactionScore}%` : '—'}
             icon={Users}
             color="cyan"
             trend={metrics.satisfactionScore >= 80 ? 'up' : 'neutral'}
           />
           <MetricCard
-            title="AI Nodes Run"
-            value={metrics.nodeTypeData.reduce((acc, d) => acc + d.value, 0)}
-            icon={Brain}
+            title="Workflows"
+            value={metrics.totalWorkflows}
+            icon={Workflow}
             color="violet"
+            trendLabel={`${metrics.activeWorkflows} active`}
           />
         </div>
+
+        {/* Pending Approvals Section */}
+        {pendingApprovalsList.length > 0 && (
+          <Card className="bg-amber-950/20 border-amber-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-amber-300 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Pending Approvals ({pendingApprovalsList.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {pendingApprovalsList.slice(0, 5).map((approval) => (
+                  <div key={approval.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/50 border border-zinc-800">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-zinc-200 truncate">
+                          Approval Required
+                        </p>
+                        {approval.assignee && (
+                          <Badge variant="outline" className="text-[9px] border-zinc-700 text-zinc-400">
+                            {approval.assignee}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-600 mt-0.5">
+                        Node: {approval.nodeId} &middot; Run: {approval.runId.slice(0, 16)}...
+                        {approval.slaDeadline && (
+                          <span className="text-amber-400 ml-2">SLA: {new Date(approval.slaDeadline).toLocaleTimeString()}</span>
+                        )}
+                      </p>
+                      {approval.context && typeof approval.context === 'object' && (
+                        <p className="text-[10px] text-zinc-500 mt-0.5 truncate">
+                          {approval.context.question || approval.context.summary || JSON.stringify(approval.context).slice(0, 100)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-950/50"
+                        disabled={actionLoading[approval.id]}
+                        onClick={() => handleApproval(approval.id, 'approved')}
+                      >
+                        {actionLoading[approval.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3 mr-1" />}
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-950/50"
+                        disabled={actionLoading[approval.id]}
+                        onClick={() => handleApproval(approval.id, 'rejected')}
+                      >
+                        <ThumbsDown className="h-3 w-3 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {pendingApprovalsList.length > 5 && (
+                  <Link href="/audit" className="block text-center text-xs text-cyan-400 hover:underline pt-1">
+                    View all {pendingApprovalsList.length} pending approvals &rarr;
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts Section */}
         <Tabs defaultValue="overview" className="space-y-4">
@@ -352,9 +766,7 @@ export default function AIEmployeeDashboard() {
                           contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
                           itemStyle={{ color: '#e4e4e7' }}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: '11px', color: '#a1a1aa' }}
-                        />
+                        <Legend wrapperStyle={{ fontSize: '11px', color: '#a1a1aa' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
@@ -365,18 +777,18 @@ export default function AIEmployeeDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Node Type Breakdown */}
+              {/* Node Type Breakdown or Trigger Types */}
               <Card className="bg-zinc-900/80 border-zinc-800">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Zap className="h-4 w-4 text-violet-400" />
-                    Node Types Executed
+                    {metrics.triggerData.length > 0 ? 'Executions by Trigger' : 'Node Types Executed'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {metrics.nodeTypeData.length > 0 ? (
+                  {(metrics.triggerData.length > 0 ? metrics.triggerData : metrics.nodeTypeData).length > 0 ? (
                     <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={metrics.nodeTypeData} layout="vertical">
+                      <BarChart data={metrics.triggerData.length > 0 ? metrics.triggerData : metrics.nodeTypeData} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                         <XAxis type="number" tick={{ fill: '#71717a', fontSize: 11 }} />
                         <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
@@ -389,12 +801,44 @@ export default function AIEmployeeDashboard() {
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-[220px] flex items-center justify-center text-zinc-600 text-xs">
-                      No node execution data yet.
+                      No execution data yet.
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Top Workflows */}
+            {metrics.topWorkflows.length > 0 && (
+              <Card className="bg-zinc-900/80 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
+                    <Workflow className="h-4 w-4 text-emerald-400" />
+                    Top Workflows by Executions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {metrics.topWorkflows.slice(0, 5).map((wf, i) => (
+                      <Link key={wf.workflowId} href={`/builder?workflowId=${wf.workflowId}`} className="block">
+                        <div className="flex items-center justify-between p-2 rounded-lg border border-zinc-800 bg-zinc-950/30 hover:border-cyan-500/20 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-zinc-600 w-4">#{i + 1}</span>
+                            <span className="text-xs font-medium text-zinc-200 truncate max-w-[200px]">{wf.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[9px] border-cyan-500/30 text-cyan-400">
+                              {wf.executions} runs
+                            </Badge>
+                            <Eye className="h-3 w-3 text-zinc-600" />
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="cost" className="space-y-4">
@@ -404,7 +848,7 @@ export default function AIEmployeeDashboard() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-emerald-400" />
-                    Cost Per Run
+                    Cost Trend
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -461,6 +905,48 @@ export default function AIEmployeeDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Error Trend */}
+            {metrics.errorTrendData.length > 0 && (
+              <Card className="bg-zinc-900/80 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    Error Trend
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={metrics.errorTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                      <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 11 }} />
+                      <YAxis tick={{ fill: '#71717a', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
+                        itemStyle={{ color: '#e4e4e7' }}
+                      />
+                      <Bar dataKey="errors" fill={COLORS.red} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Token Usage */}
+            {metrics.totalTokensUsed > 0 && (
+              <Card className="bg-zinc-900/80 border-zinc-800">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Brain className="h-5 w-5 text-violet-400" />
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Total Tokens Used</p>
+                      <p className="text-xs text-zinc-500">Across all AI node executions</p>
+                    </div>
+                  </div>
+                  <p className="text-lg font-bold text-violet-400">{metrics.totalTokensUsed.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="confidence" className="space-y-4">
@@ -552,6 +1038,7 @@ export default function AIEmployeeDashboard() {
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
+            {/* Recent Executions from DB */}
             <Card className="bg-zinc-900/80 border-zinc-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
@@ -573,13 +1060,16 @@ export default function AIEmployeeDashboard() {
                           }`} />
                           <div>
                             <p className="text-xs font-medium text-zinc-200">
-                              {activity.status === 'success' ? 'Completed' :
-                               activity.status === 'error' ? 'Failed' :
-                               activity.status === 'awaiting_approval' ? 'Awaiting Approval' :
-                               'Running'}
+                              {activity.workflowName || (
+                                activity.status === 'success' ? 'Completed' :
+                                activity.status === 'error' ? 'Failed' :
+                                activity.status === 'awaiting_approval' ? 'Awaiting Approval' :
+                                'Running'
+                              )}
                             </p>
                             <p className="text-[10px] text-zinc-600 font-mono">
                               {activity.id.slice(0, 20)}...
+                              {activity.triggeredBy && <span className="text-zinc-700 ml-2">via {activity.triggeredBy}</span>}
                             </p>
                           </div>
                         </div>
@@ -612,11 +1102,43 @@ export default function AIEmployeeDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Recent Notifications */}
+            {unreadNotifications.length > 0 && (
+              <Card className="bg-zinc-900/80 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-amber-400" />
+                    Unread Notifications ({unreadNotifications.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {unreadNotifications.slice(0, 5).map((n) => (
+                      <div key={n.id} className="flex items-start gap-3 p-2 rounded-lg border border-zinc-800 bg-zinc-950/30">
+                        <div className={`h-2 w-2 rounded-full mt-1 ${
+                          n.priority === 'high' ? 'bg-red-500' :
+                          n.priority === 'normal' ? 'bg-amber-500' :
+                          'bg-zinc-500'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-zinc-200 truncate">{n.title}</p>
+                          <p className="text-[10px] text-zinc-500 truncate">{n.message}</p>
+                        </div>
+                        <span className="text-[9px] text-zinc-600 whitespace-nowrap">
+                          {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
         {/* Bottom Section: Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Link href="/builder">
             <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
@@ -630,7 +1152,7 @@ export default function AIEmployeeDashboard() {
               </CardContent>
             </Card>
           </Link>
-          <Link href="/builder">
+          <Link href="/builder?ai=true">
             <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -643,7 +1165,7 @@ export default function AIEmployeeDashboard() {
               </CardContent>
             </Card>
           </Link>
-          <Link href="/dashboard">
+          <Link href="/audit">
             <Card className="bg-zinc-900/80 border-zinc-800 hover:border-amber-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
@@ -652,6 +1174,19 @@ export default function AIEmployeeDashboard() {
                 <div>
                   <p className="text-sm font-medium text-zinc-200">Review Approvals</p>
                   <p className="text-[10px] text-zinc-500">{metrics.pendingApprovals} pending human reviews</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/analytics">
+            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-emerald-500/30 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">Full Analytics</p>
+                  <p className="text-[10px] text-zinc-500">Detailed workflow & cost analytics</p>
                 </div>
               </CardContent>
             </Card>

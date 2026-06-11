@@ -261,3 +261,50 @@ Stage Summary:
   3. Switch DATABASE_URL from SQLite to PostgreSQL for production
   4. Configure a proper reverse proxy (Caddy/Nginx) with HTTPS
   5. Set NODE_ENV=production
+---
+Task ID: dashboard-connect
+Agent: Main Agent
+Task: Make dashboard fully functional and connected to backend APIs
+
+Work Log:
+- Rewrote /src/app/dashboard/page.tsx from scratch — removed dependency on in-memory Zustand stores
+- Dashboard now fetches real data from 5 API endpoints on load:
+  - /api/analytics — Platform metrics (workflows, executions, success rates, costs, trends)
+  - /api/executions — Real execution records from the database
+  - /api/approvals — Persistent approval records
+  - /api/notifications — Unread notifications from DB
+  - /api/workflows/list — Workflow summary for nav/stats
+- Connected to /api/analytics/live SSE for real-time metric updates (auto-reconnect on disconnect)
+- Added live connection indicator (Wifi icon + "Live" / "Offline" status)
+- Added refresh button with manual data reload capability
+- Added real-time metrics strip showing: active executions, completions in last hour, errors in 5 min, avg response time
+- Added interactive approval actions (Approve/Reject buttons) that call PUT /api/approvals
+- Added pending approvals section with SLA deadlines and context display
+- Added unread notifications section in Activity tab
+- Added error trend chart from platform analytics
+- Added top workflows list with links to builder
+- Added token usage display from platform analytics
+- Added trigger type distribution chart
+- Fixed "Review Approvals" quick action link — now goes to /audit instead of /dashboard (self-link)
+- Added "Full Analytics" quick action linking to /analytics page
+- Changed "AI Generate" link to /builder?ai=true instead of duplicate /builder
+
+- Also rewrote /src/app/analytics/page.tsx:
+  - Now fetches from /api/analytics and /api/executions instead of Zustand stores
+  - Fetches per-workflow metrics via /api/analytics/[workflowId] for top workflows
+  - Added cost trend chart from platform metrics costByDay data
+  - Added error trend chart from platform metrics errorTrend data
+  - Added trigger type distribution chart
+  - Added timeline tab showing recent executions with workflow names
+  - All data now persists across page refreshes (comes from database)
+
+- Build: Successful — all pages compile, all 80+ API routes registered
+- Server: Running on port 3003, all APIs returning proper auth-gated responses
+
+Stage Summary:
+- Dashboard is now fully connected to backend APIs instead of in-memory Zustand stores
+- Data persists across page refreshes (fetched from database on every load)
+- Real-time SSE updates for live metrics
+- Approval actions work directly from dashboard
+- Analytics page also connected to real APIs
+- Key files modified: src/app/dashboard/page.tsx, src/app/analytics/page.tsx

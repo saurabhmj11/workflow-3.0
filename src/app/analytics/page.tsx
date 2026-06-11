@@ -1,22 +1,75 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  BarChart3, TrendingUp, TrendingDown, DollarSign, Clock,
-  Zap, AlertTriangle, CheckCircle2, Activity, ArrowRight,
-  Bot, Shield, Brain, Target, Timer, Database, Inbox
+  BarChart3, TrendingUp, DollarSign, Clock,
+  Zap, AlertTriangle, CheckCircle2, Activity,
+  Bot, Shield, Brain, Target, Timer, Database, Inbox,
+  RefreshCw, Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useExecutionStore } from '@/stores/execution-store'
-import { useApprovalStore } from '@/stores/approval-store'
-import type { ExecutionResult, NodeExecutionStep } from '@/lib/types'
-import { getCategoryForType } from '@/lib/types'
+import {
+  AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts'
 
-// ─── Icon map for per-workflow display ────────────
+// ─── Types ───────────────────────────────────────
+interface PlatformMetrics {
+  totalWorkflows: number
+  activeWorkflows: number
+  totalExecutions: number
+  successRate: number
+  totalCostUsd: number
+  totalTokensUsed: number
+  avgExecutionTime: number
+  executionsByTrigger: Record<string, number>
+  topWorkflowsByExecutions: Array<{ workflowId: string; name: string; executions: number }>
+  costByDay: Array<{ date: string; cost: number }>
+  errorTrend: Array<{ date: string; errors: number }>
+}
+
+interface WorkflowMetrics {
+  workflowId: string
+  totalExecutions: number
+  successRate: number
+  avgDurationMs: number
+  avgCostUsd: number
+  totalCostUsd: number
+  last24h: { executions: number; successRate: number; avgDurationMs: number; errors: number; costUsd: number }
+  last7d: { executions: number; successRate: number; avgDurationMs: number; errors: number; costUsd: number }
+  nodeTypeBreakdown: Record<string, { count: number; avgDurationMs: number; errorRate: number }>
+  hourlyTimeline: Array<{ hour: string; executions: number; errors: number; avgDuration: number; cost: number }>
+}
+
+interface ExecutionRecord {
+  id: string
+  workflowId: string
+  workflowName?: string
+  runId: string
+  status: string
+  triggeredBy: string
+  steps: Array<{ nodeType?: string; status?: string; output?: any; startedAt?: string; finishedAt?: string; tokenUsage?: { prompt?: number; completion?: number }; costUsd?: number; error?: string }>
+  totalDurationMs: number
+  totalCostUsd: number
+  error?: string
+  startedAt: string
+  finishedAt?: string
+}
+
+const COLORS = {
+  emerald: '#10b981',
+  cyan: '#06b6d4',
+  violet: '#8b5cf6',
+  amber: '#f59e0b',
+  red: '#ef4444',
+  blue: '#3b82f6',
+}
+
+// ─── Icon map ────────────────────────────────────
 const WORKFLOW_ICONS: Record<string, typeof Bot> = {
   'AI Support Employee': Bot,
   'SDR Employee': Target,
@@ -31,167 +84,7 @@ function getDefaultIcon(name: string) {
   return Activity
 }
 
-// ─── Compute metrics from real execution results ──
-
-interface PerWorkflowStats {
-  workflowId: string
-  workflowName: string
-  icon: typeof Bot
-  color: string
-  bgColor: string
-  runs: number
-  successRate: number
-  avgCost: number
-  avgDurationMs: number
-  avgConfidence: number
-  escalationRate: number
-  tokensUsed: number
-  totalCost: number
-  steps: NodeExecutionStep[]
-}
-
-function computePerWorkflowStats(results: ExecutionResult[]): PerWorkflowStats[] {
-  const byWorkflow = new Map<string, ExecutionResult[]>()
-  for (const r of results) {
-    const key = r.workflowId || 'unknown'
-    const list = byWorkflow.get(key) ?? []
-    list.push(r)
-    byWorkflow.set(key, list)
-  }
-
-  const colors = [
-    { color: 'text-violet-400', bgColor: 'bg-violet-500/10' },
-    { color: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
-    { color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
-    { color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
-    { color: 'text-rose-400', bgColor: 'bg-rose-500/10' },
-    { color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
-  ]
-
-  const stats: PerWorkflowStats[] = []
-  let colorIdx = 0
-  for (const [workflowId, runs] of byWorkflow) {
-    const totalRuns = runs.length
-    const successRuns = runs.filter(r => r.status === 'success').length
-    const escalationRuns = runs.filter(r => r.status === 'awaiting_approval').length
-    const totalCost = runs.reduce((a, r) => a + (r.totalCostUsd ?? 0), 0)
-    const totalDuration = runs.reduce((a, r) => a + r.totalDurationMs, 0)
-
-    const allSteps = runs.flatMap(r => r.steps)
-    const tokensUsed = allSteps.reduce((a, s) => {
-      if (!s.tokenUsage) return a
-      return a + (s.tokenUsage.prompt ?? 0) + (s.tokenUsage.completion ?? 0)
-    }, 0)
-
-    // Confidence from AI node outputs
-    const confidences: number[] = []
-    for (const step of allSteps) {
-      const output = step.output as Record<string, unknown> | undefined
-      if (output && typeof output === 'object' && 'confidence' in output && typeof output.confidence === 'number') {
-        confidences.push(output.confidence)
-      }
-    }
-    const avgConfidence = confidences.length > 0 ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 0
-
-    const workflowName = workflowId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    const c = colors[colorIdx % colors.length]
-    colorIdx++
-
-    stats.push({
-      workflowId,
-      workflowName,
-      icon: getDefaultIcon(workflowName),
-      color: c.color,
-      bgColor: c.bgColor,
-      runs: totalRuns,
-      successRate: totalRuns > 0 ? (successRuns / totalRuns) * 100 : 0,
-      avgCost: totalRuns > 0 ? totalCost / totalRuns : 0,
-      avgDurationMs: totalRuns > 0 ? totalDuration / totalRuns : 0,
-      avgConfidence,
-      escalationRate: totalRuns > 0 ? (escalationRuns / totalRuns) * 100 : 0,
-      tokensUsed,
-      totalCost,
-      steps: allSteps,
-    })
-  }
-  return stats
-}
-
-interface CostByNodeType {
-  type: string
-  avgCost: number
-  runs: number
-  totalCost: number
-  percentage: number
-}
-
-function computeCostByNodeType(results: ExecutionResult[]): CostByNodeType[] {
-  const byType = new Map<string, { costs: number[]; totalCost: number }>()
-  for (const r of results) {
-    for (const step of r.steps) {
-      const nodeType = step.nodeType || 'unknown'
-      const cost = step.costUsd ?? 0
-      const entry = byType.get(nodeType) ?? { costs: [], totalCost: 0 }
-      entry.costs.push(cost)
-      entry.totalCost += cost
-      byType.set(nodeType, entry)
-    }
-  }
-
-  const items: CostByNodeType[] = []
-  const grandTotal = Array.from(byType.values()).reduce((a, e) => a + e.totalCost, 0)
-  for (const [type, data] of byType) {
-    const category = getCategoryForType(type as any)
-    const label = category.category === 'ai' ? type.toUpperCase() : `${type.charAt(0).toUpperCase() + type.slice(1)} Action`
-    items.push({
-      type: label,
-      avgCost: data.costs.length > 0 ? data.totalCost / data.costs.length : 0,
-      runs: data.costs.length,
-      totalCost: data.totalCost,
-      percentage: grandTotal > 0 ? (data.totalCost / grandTotal) * 100 : 0,
-    })
-  }
-
-  items.sort((a, b) => b.totalCost - a.totalCost)
-  return items
-}
-
-interface FailureReason {
-  reason: string
-  count: number
-  percentage: number
-}
-
-function computeFailureReasons(results: ExecutionResult[]): FailureReason[] {
-  const reasons = new Map<string, number>()
-  for (const r of results) {
-    for (const step of r.steps) {
-      if (step.status === 'error' && step.error) {
-        // Normalize error messages into categories
-        let reason = step.error
-        if (reason.toLowerCase().includes('timeout')) reason = 'API Timeout'
-        else if (reason.toLowerCase().includes('rate limit') || reason.toLowerCase().includes('429')) reason = 'Rate Limit Hit'
-        else if (reason.toLowerCase().includes('auth') || reason.toLowerCase().includes('token') || reason.toLowerCase().includes('unauthorized')) reason = 'Auth Token Expired'
-        else if (reason.toLowerCase().includes('confidence') || reason.toLowerCase().includes('escalat')) reason = 'Low Confidence Escalation'
-        else if (reason.toLowerCase().includes('invalid') || reason.toLowerCase().includes('format') || reason.toLowerCase().includes('parse')) reason = 'Invalid Input Format'
-        else {
-          // Truncate long errors
-          reason = reason.length > 60 ? reason.slice(0, 57) + '...' : reason
-        }
-        reasons.set(reason, (reasons.get(reason) ?? 0) + 1)
-      }
-    }
-  }
-
-  const total = Array.from(reasons.values()).reduce((a, b) => a + b, 0)
-  const items = Array.from(reasons.entries())
-    .map(([reason, count]) => ({ reason, count, percentage: total > 0 ? (count / total) * 100 : 0 }))
-    .sort((a, b) => b.count - a.count)
-  return items
-}
-
 // ─── MiniSparkline ────────────────────────────────
-
 function MiniSparkline({ data, color = '#8b5cf6', height = 32 }: { data: number[]; color?: string; height?: number }) {
   if (data.length < 2) {
     return (
@@ -217,8 +110,7 @@ function MiniSparkline({ data, color = '#8b5cf6', height = 32 }: { data: number[
   )
 }
 
-// ─── ROI Calculator (kept as-is) ──────────────────
-
+// ─── ROI Calculator ──────────────────────────────
 function ROICalculator() {
   const [ticketsPerMonth, setTicketsPerMonth] = useState(500)
   const beforeCost = ticketsPerMonth * 2.80
@@ -284,7 +176,6 @@ function ROICalculator() {
 }
 
 // ─── Empty State ──────────────────────────────────
-
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -313,22 +204,75 @@ function EmptyState() {
 }
 
 // ─── Main Analytics Page ──────────────────────────
-
 export default function AnalyticsPage() {
-  const results = useExecutionStore((s) => s.results)
-  const approvalRequests = useApprovalStore((s) => s.requests)
+  const [platformMetrics, setPlatformMetrics] = useState<PlatformMetrics | null>(null)
+  const [workflowMetricsMap, setWorkflowMetricsMap] = useState<Map<string, WorkflowMetrics>>(new Map())
+  const [executions, setExecutions] = useState<ExecutionRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const hasData = results.length > 0
+  const fetchData = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setIsRefreshing(true)
+    try {
+      const [analyticsRes, executionsRes] = await Promise.allSettled([
+        fetch('/api/analytics'),
+        fetch('/api/executions?limit=100'),
+      ])
+
+      if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) {
+        const json = await analyticsRes.value.json()
+        if (json.ok) {
+          setPlatformMetrics(json.data.platform)
+        }
+      }
+
+      if (executionsRes.status === 'fulfilled' && executionsRes.value.ok) {
+        const json = await executionsRes.value.json()
+        if (json.ok && Array.isArray(json.data)) {
+          setExecutions(json.data)
+        }
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Fetch per-workflow metrics for top workflows
+  useEffect(() => {
+    if (!platformMetrics?.topWorkflowsByExecutions?.length) return
+    const topIds = platformMetrics.topWorkflowsByExecutions.slice(0, 5).map(w => w.workflowId)
+    Promise.allSettled(
+      topIds.map(id => fetch(`/api/analytics/${id}`).then(r => r.json()))
+    ).then(results => {
+      const newMap = new Map<string, WorkflowMetrics>()
+      for (const res of results) {
+        if (res.status === 'fulfilled' && res.value?.ok && res.value?.data) {
+          const m = res.value.data as WorkflowMetrics
+          newMap.set(m.workflowId, m)
+        }
+      }
+      setWorkflowMetricsMap(newMap)
+    })
+  }, [platformMetrics?.topWorkflowsByExecutions])
+
+  const hasData = executions.length > 0 || (platformMetrics?.totalExecutions ?? 0) > 0
 
   // Compute all metrics from real data
-  const { totalRuns, successRate, avgConfidence, totalCost, escalationRate, workflowStats, costByNodeType, failureReasons } = useMemo(() => {
-    const totalRuns = results.length
-    const successCount = results.filter(r => r.status === 'success').length
-    const escalationCount = results.filter(r => r.status === 'awaiting_approval').length
-    const totalCost = results.reduce((a, r) => a + (r.totalCostUsd ?? 0), 0)
+  const { totalRuns, successRate, avgConfidence, totalCost, escalationRate, costByNodeType, failureReasons } = useMemo(() => {
+    const totalRuns = platformMetrics?.totalExecutions ?? executions.length
+    const successCount = executions.filter(r => r.status === 'success').length
+    const escalationCount = executions.filter(r => r.status === 'awaiting_approval').length
+    const totalCost = platformMetrics?.totalCostUsd ?? executions.reduce((a, r) => a + (r.totalCostUsd ?? 0), 0)
 
     // Confidence from AI node outputs
-    const allSteps = results.flatMap(r => r.steps)
+    const allSteps = executions.flatMap(r => r.steps ?? [])
     const confidences: number[] = []
     for (const step of allSteps) {
       const output = step.output as Record<string, unknown> | undefined
@@ -338,20 +282,85 @@ export default function AnalyticsPage() {
     }
     const avgConfidence = confidences.length > 0 ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 0
 
+    // Cost by node type
+    const byType = new Map<string, { costs: number[]; totalCost: number }>()
+    for (const step of allSteps) {
+      const nodeType = step.nodeType || 'unknown'
+      const cost = step.costUsd ?? 0
+      const entry = byType.get(nodeType) ?? { costs: [], totalCost: 0 }
+      entry.costs.push(cost)
+      entry.totalCost += cost
+      byType.set(nodeType, entry)
+    }
+    const grandTotal = Array.from(byType.values()).reduce((a, e) => a + e.totalCost, 0)
+    const costByNodeType = Array.from(byType.entries()).map(([type, data]) => ({
+      type: type.charAt(0).toUpperCase() + type.slice(1),
+      avgCost: data.costs.length > 0 ? data.totalCost / data.costs.length : 0,
+      runs: data.costs.length,
+      totalCost: data.totalCost,
+      percentage: grandTotal > 0 ? (data.totalCost / grandTotal) * 100 : 0,
+    })).sort((a, b) => b.totalCost - a.totalCost)
+
+    // Failure reasons
+    const reasons = new Map<string, number>()
+    for (const step of allSteps) {
+      if (step.status === 'error' && step.error) {
+        let reason = step.error
+        if (reason.toLowerCase().includes('timeout')) reason = 'API Timeout'
+        else if (reason.toLowerCase().includes('rate limit') || reason.toLowerCase().includes('429')) reason = 'Rate Limit Hit'
+        else if (reason.toLowerCase().includes('auth') || reason.toLowerCase().includes('token')) reason = 'Auth Token Expired'
+        else if (reason.toLowerCase().includes('confidence')) reason = 'Low Confidence Escalation'
+        else {
+          reason = reason.length > 60 ? reason.slice(0, 57) + '...' : reason
+        }
+        reasons.set(reason, (reasons.get(reason) ?? 0) + 1)
+      }
+    }
+    const total = Array.from(reasons.values()).reduce((a, b) => a + b, 0)
+    const failureReasons = Array.from(reasons.entries())
+      .map(([reason, count]) => ({ reason, count, percentage: total > 0 ? (count / total) * 100 : 0 }))
+      .sort((a, b) => b.count - a.count)
+
     return {
       totalRuns,
-      successRate: totalRuns > 0 ? (successCount / totalRuns) * 100 : 0,
+      successRate: platformMetrics?.successRate
+        ? platformMetrics.successRate * 100
+        : totalRuns > 0 ? (successCount / totalRuns) * 100 : 0,
       avgConfidence,
       totalCost,
       escalationRate: totalRuns > 0 ? (escalationCount / totalRuns) * 100 : 0,
-      workflowStats: computePerWorkflowStats(results),
-      costByNodeType: computeCostByNodeType(results),
-      failureReasons: computeFailureReasons(results),
+      costByNodeType,
+      failureReasons,
     }
-  }, [results])
+  }, [executions, platformMetrics])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-violet-400" />
+          <p className="text-sm text-zinc-400">Loading Analytics...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-lg font-semibold text-zinc-100">Workflow Analytics</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
+            className="h-8 text-xs border-zinc-800 hover:bg-zinc-800"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
 
         {!hasData ? (
           <EmptyState />
@@ -408,37 +417,44 @@ export default function AnalyticsPage() {
 
             <Tabs defaultValue="employees" className="space-y-6">
               <TabsList className="bg-slate-900 border-slate-800">
-                <TabsTrigger value="employees">Per Employee</TabsTrigger>
+                <TabsTrigger value="employees">Per Workflow</TabsTrigger>
                 <TabsTrigger value="costs">Cost Breakdown</TabsTrigger>
                 <TabsTrigger value="failures">Failure Analysis</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="roi">ROI</TabsTrigger>
               </TabsList>
 
-              {/* Per Employee Tab */}
+              {/* Per Workflow Tab */}
               <TabsContent value="employees" className="space-y-4">
-                {workflowStats.length > 0 ? workflowStats.map((emp) => {
-                  const Icon = emp.icon
-                  // Build sparkline data from individual results (last 14 runs)
-                  const recentResults = results
-                    .filter(r => r.workflowId === emp.workflowId)
-                    .slice(0, 14)
-                    .reverse()
-                  const dailyRuns = recentResults.map(() => 1) // Each result is one run
-                  const dailyCost = recentResults.map(r => r.totalCostUsd ?? 0)
+                {platformMetrics?.topWorkflowsByExecutions?.length ? platformMetrics.topWorkflowsByExecutions.map((wf) => {
+                  const metrics = workflowMetricsMap.get(wf.workflowId)
+                  const Icon = getDefaultIcon(wf.name)
+                  const colors = [
+                    { color: 'text-violet-400', bgColor: 'bg-violet-500/10' },
+                    { color: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
+                    { color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
+                    { color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
+                    { color: 'text-rose-400', bgColor: 'bg-rose-500/10' },
+                  ]
+                  const c = colors[platformMetrics.topWorkflowsByExecutions.indexOf(wf) % colors.length]
+
+                  // Build sparkline data from hourly timeline
+                  const costTrend = metrics?.hourlyTimeline?.slice(-14).map(h => h.cost) ?? []
+                  const execTrend = metrics?.hourlyTimeline?.slice(-14).map(h => h.executions) ?? []
 
                   return (
-                    <Card key={emp.workflowId} className="bg-slate-900/50 border-slate-800">
+                    <Card key={wf.workflowId} className="bg-slate-900/50 border-slate-800">
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${emp.bgColor}`}>
-                              <Icon className={`h-5 w-5 ${emp.color}`} />
+                            <div className={`p-2 rounded-lg ${c.bgColor}`}>
+                              <Icon className={`h-5 w-5 ${c.color}`} />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-white">{emp.workflowName}</h3>
+                              <h3 className="font-semibold text-white">{wf.name}</h3>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-400">
-                                  {emp.runs.toLocaleString()} runs
+                                  {wf.executions.toLocaleString()} runs
                                 </Badge>
                                 <Activity className="h-3 w-3 text-slate-500" />
                               </div>
@@ -447,40 +463,52 @@ export default function AnalyticsPage() {
                           <div className="flex items-center gap-4">
                             <div className="text-right">
                               <div className="text-xs text-slate-500">Cost trend</div>
-                              <MiniSparkline data={dailyCost} color="#10b981" />
+                              <MiniSparkline data={costTrend.length > 1 ? costTrend : [0, wf.executions * 0.01]} color="#10b981" />
                             </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
                           <div className="bg-slate-800/50 rounded-lg p-3">
                             <div className="text-xs text-slate-500">Success</div>
-                            <div className="text-sm font-semibold text-emerald-400">{emp.successRate.toFixed(1)}%</div>
-                          </div>
-                          <div className="bg-slate-800/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-500">Avg Cost</div>
-                            <div className="text-sm font-semibold text-white">${emp.avgCost.toFixed(3)}</div>
-                          </div>
-                          <div className="bg-slate-800/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-500">Avg Time</div>
-                            <div className="text-sm font-semibold text-white">{(emp.avgDurationMs / 1000).toFixed(1)}s</div>
-                          </div>
-                          <div className="bg-slate-800/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-500">Confidence</div>
-                            <div className="text-sm font-semibold text-violet-400">
-                              {emp.avgConfidence > 0 ? `${(emp.avgConfidence * 100).toFixed(0)}%` : '—'}
+                            <div className="text-sm font-semibold text-emerald-400">
+                              {metrics ? `${(metrics.successRate * 100).toFixed(1)}%` : '—'}
                             </div>
                           </div>
                           <div className="bg-slate-800/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-500">Escalation</div>
-                            <div className="text-sm font-semibold text-amber-400">{emp.escalationRate.toFixed(1)}%</div>
+                            <div className="text-xs text-slate-500">Avg Cost</div>
+                            <div className="text-sm font-semibold text-white">
+                              ${metrics ? metrics.avgCostUsd.toFixed(3) : '—'}
+                            </div>
                           </div>
                           <div className="bg-slate-800/50 rounded-lg p-3">
-                            <div className="text-xs text-slate-500">Tokens</div>
-                            <div className="text-sm font-semibold text-white">{emp.tokensUsed > 1000 ? `${(emp.tokensUsed / 1000).toFixed(0)}K` : emp.tokensUsed}</div>
+                            <div className="text-xs text-slate-500">Avg Time</div>
+                            <div className="text-sm font-semibold text-white">
+                              {metrics ? `${(metrics.avgDurationMs / 1000).toFixed(1)}s` : '—'}
+                            </div>
+                          </div>
+                          <div className="bg-slate-800/50 rounded-lg p-3">
+                            <div className="text-xs text-slate-500">Last 24h</div>
+                            <div className="text-sm font-semibold text-cyan-400">
+                              {metrics ? `${metrics.last24h.executions} runs` : '—'}
+                            </div>
+                          </div>
+                          <div className="bg-slate-800/50 rounded-lg p-3">
+                            <div className="text-xs text-slate-500">Errors (7d)</div>
+                            <div className="text-sm font-semibold text-amber-400">
+                              {metrics ? metrics.last7d.errors : '—'}
+                            </div>
+                          </div>
+                          <div className="bg-slate-800/50 rounded-lg p-3">
+                            <div className="text-xs text-slate-500">Node Types</div>
+                            <div className="text-sm font-semibold text-white">
+                              {metrics ? Object.keys(metrics.nodeTypeBreakdown).length : '—'}
+                            </div>
                           </div>
                           <div className="bg-slate-800/50 rounded-lg p-3">
                             <div className="text-xs text-slate-500">Total Cost</div>
-                            <div className="text-sm font-semibold text-white">${emp.totalCost.toFixed(2)}</div>
+                            <div className="text-sm font-semibold text-white">
+                              ${metrics ? metrics.totalCostUsd.toFixed(2) : '—'}
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -498,6 +526,33 @@ export default function AnalyticsPage() {
 
               {/* Cost Breakdown Tab */}
               <TabsContent value="costs" className="space-y-4">
+                {/* Cost by Day Chart */}
+                {platformMetrics?.costByDay?.length ? (
+                  <Card className="bg-slate-900/50 border-slate-800">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-emerald-400" />
+                        Daily Cost Trend
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <AreaChart data={platformMetrics.costByDay.slice(-30)}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                          <XAxis dataKey="date" tick={{ fill: '#71717a', fontSize: 11 }} />
+                          <YAxis tick={{ fill: '#71717a', fontSize: 11 }} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
+                            itemStyle={{ color: '#e4e4e7' }}
+                            formatter={(value: number) => [`$${value.toFixed(4)}`, 'Cost']}
+                          />
+                          <Area type="monotone" dataKey="cost" stroke={COLORS.emerald} fill={COLORS.emerald} fillOpacity={0.15} strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 <Card className="bg-slate-900/50 border-slate-800">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
@@ -539,10 +594,62 @@ export default function AnalyticsPage() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Trigger Distribution */}
+                {platformMetrics?.executionsByTrigger && Object.keys(platformMetrics.executionsByTrigger).length > 0 && (
+                  <Card className="bg-slate-900/50 border-slate-800">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-cyan-400" />
+                        Executions by Trigger Type
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={Object.entries(platformMetrics.executionsByTrigger).map(([name, value]) => ({ name, value }))} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                          <XAxis type="number" tick={{ fill: '#71717a', fontSize: 11 }} />
+                          <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
+                            itemStyle={{ color: '#e4e4e7' }}
+                          />
+                          <Bar dataKey="value" fill={COLORS.cyan} radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               {/* Failure Analysis Tab */}
               <TabsContent value="failures" className="space-y-4">
+                {/* Error Trend Chart */}
+                {platformMetrics?.errorTrend?.length ? (
+                  <Card className="bg-slate-900/50 border-slate-800">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-400" />
+                        Error Trend
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={platformMetrics.errorTrend.slice(-30)}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                          <XAxis dataKey="date" tick={{ fill: '#71717a', fontSize: 11 }} />
+                          <YAxis tick={{ fill: '#71717a', fontSize: 11 }} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
+                            itemStyle={{ color: '#e4e4e7' }}
+                          />
+                          <Bar dataKey="errors" fill={COLORS.red} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 <Card className="bg-slate-900/50 border-slate-800">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
@@ -575,51 +682,64 @@ export default function AnalyticsPage() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
 
-                <Card className="bg-slate-900/50 border-slate-800">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <Timer className="h-5 w-5 text-cyan-400" />
-                      Escalation Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {escalationRate > 0 ? (
-                      <div className="space-y-3">
-                        {results
-                          .filter(r => r.status === 'awaiting_approval')
-                          .slice(0, 5)
-                          .map((r) => (
-                            <div key={r.runId} className="flex items-center gap-4 bg-slate-800/30 rounded-lg p-3">
-                              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm text-slate-300 truncate">
-                                  {r.workflowId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {r.steps.length} steps · {r.totalDurationMs > 0 ? `${(r.totalDurationMs / 1000).toFixed(1)}s` : 'In progress'}
-                                  {(r.totalCostUsd ?? 0) > 0 && ` · $${(r.totalCostUsd ?? 0).toFixed(3)}`}
-                                </div>
+              {/* Timeline Tab */}
+              <TabsContent value="timeline" className="space-y-4">
+                {executions.length > 0 ? (
+                  <Card className="bg-slate-900/50 border-slate-800">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-cyan-400" />
+                        Recent Executions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {executions.slice(0, 20).map((exec) => (
+                          <div key={exec.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-slate-950/30">
+                            <div className="flex items-center gap-3">
+                              <div className={`h-2 w-2 rounded-full ${
+                                exec.status === 'success' ? 'bg-emerald-500' :
+                                exec.status === 'error' ? 'bg-red-500' :
+                                exec.status === 'awaiting_approval' ? 'bg-amber-500' :
+                                'bg-blue-500'
+                              }`} />
+                              <div>
+                                <p className="text-sm text-slate-300">{exec.workflowName || exec.workflowId}</p>
+                                <p className="text-xs text-slate-600 font-mono">
+                                  {exec.runId.slice(0, 20)}... via {exec.triggeredBy}
+                                </p>
                               </div>
-                              <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-400 shrink-0">
-                                Awaiting Approval
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs text-slate-500">
+                                {(exec.totalDurationMs / 1000).toFixed(1)}s
+                              </span>
+                              <span className="text-xs text-violet-400">
+                                ${exec.totalCostUsd.toFixed(4)}
+                              </span>
+                              <Badge variant="outline" className={`text-[9px] ${
+                                exec.status === 'success' ? 'border-emerald-500/30 text-emerald-400' :
+                                exec.status === 'error' ? 'border-red-500/30 text-red-400' :
+                                'border-amber-500/30 text-amber-400'
+                              }`}>
+                                {exec.status}
                               </Badge>
                             </div>
-                          ))}
-                        {results.filter(r => r.status === 'awaiting_approval').length > 5 && (
-                          <p className="text-xs text-slate-500 text-center">
-                            +{results.filter(r => r.status === 'awaiting_approval').length - 5} more escalations
-                          </p>
-                        )}
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <div className="py-8 text-center">
-                        <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-3" />
-                        <p className="text-slate-400">No escalations recorded — all runs are flowing smoothly.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-slate-900/50 border-slate-800">
+                    <CardContent className="p-8 text-center">
+                      <Inbox className="h-8 w-8 text-slate-600 mx-auto mb-3" />
+                      <p className="text-slate-400">No execution data yet.</p>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               {/* ROI Tab */}

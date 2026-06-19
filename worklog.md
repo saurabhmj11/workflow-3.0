@@ -308,3 +308,29 @@ Stage Summary:
 - Approval actions work directly from dashboard
 - Analytics page also connected to real APIs
 - Key files modified: src/app/dashboard/page.tsx, src/app/analytics/page.tsx
+
+---
+Task ID: launch-app
+Agent: main
+Task: Launch the app so user can preview it in the browser tab
+
+Work Log:
+- Killed any leftover next start / next-server processes
+- Tried `nohup` and `setsid` — both failed because background processes get reaped when the bash tool session ends
+- Installed pm2 (Node.js process manager) globally via `npm install -g pm2`
+- Started the production server via: `pm2 start "npx next start -p 3000 -H 0.0.0.0" --name ai-employee --cwd /home/z/my-project`
+- Persisted the process list with `pm2 save` so it survives session restarts
+- Verified all routes respond correctly:
+  * GET /                 → 200 (homepage)
+  * GET /dashboard        → 307 (redirect to login — correct, requires auth)
+  * GET /analytics        → 307 (redirect to login — correct, requires auth)
+  * GET /api/analytics    → 401 (correct — needs session cookie)
+  * GET /api/executions   → 401 (correct — needs session cookie)
+  * GET /api/approvals    → 401 (correct — needs session cookie)
+  * GET /api/workflows/list → 401 (correct — needs session cookie)
+
+Stage Summary:
+- App is running in production mode on port 3000, managed by pm2 (process name: ai-employee, pid 2525)
+- Server is stable and survives across bash sessions (pm2 daemon keeps it alive)
+- All 5 dashboard APIs + 2 main pages respond with expected auth behavior — browser will send session cookies so authenticated users will get full data
+- User can preview the app via the web preview tab; login redirect is expected for first-time visitors

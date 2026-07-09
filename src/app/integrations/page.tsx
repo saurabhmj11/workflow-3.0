@@ -262,7 +262,7 @@ function OAuthDialog({
           </Button>
           <Button
             size="sm"
-            className="h-9 gap-1.5 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-xs"
+            className="h-9 gap-1.5 bg-linear-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-xs"
             onClick={handleAuthorize}
             disabled={authorizing}
           >

@@ -43,7 +43,7 @@ export function useSSE() {
           if (msg.action === 'step_update' && msg.nodeId && msg.status) {
             updateStep(msg.runId as string, {
               nodeId: msg.nodeId as string,
-              nodeType: (msg.nodeType as string) ?? 'unknown',
+              nodeType: (msg.nodeType as any) ?? 'unknown',
               label: (msg.nodeLabel as string) ?? '',
               startedAt: (msg.startedAt as string) ?? new Date().toISOString(),
               status: msg.status as 'running' | 'success' | 'error' | 'pending',

@@ -41,7 +41,7 @@ export async function GET() {
 
     const orgSettings: OrgSettings = {
       ...DEFAULT_ORG,
-      ...(metadata.organization as OrgSettings | undefined),
+      ...(metadata.organization as Record<string, unknown> || {}),
       organizationId: `org_${userId.slice(0, 8)}`,
     }
 
@@ -86,7 +86,7 @@ export async function PUT(req: NextRequest) {
     })
 
     return successResponse({
-      ...metadata.organization,
+      ...(metadata.organization as Record<string, unknown> || {}),
       organizationId: `org_${user.id.slice(0, 8)}`,
     })
   } catch (err) {

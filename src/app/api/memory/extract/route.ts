@@ -128,7 +128,7 @@ Extract new memory notes from these interactions. Don't repeat existing notes.`
     }
 
     // Create the notes in the database
-    const createdNotes = []
+    const createdNotes: any[] = []
     for (const note of (parsed.notes || []).slice(0, 10)) {
       try {
         const created = await db.memoryNote.create({

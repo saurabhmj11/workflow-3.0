@@ -105,7 +105,7 @@ export class NotificationDelivery {
             break
           default:
             result = {
-              channel,
+              channel: channel as NotificationChannel,
               success: false,
               error: `Unknown channel: ${channel}`,
               deliveredAt: new Date().toISOString(),
@@ -117,7 +117,7 @@ export class NotificationDelivery {
         const error = err instanceof Error ? err.message : 'Unknown delivery error'
         log.error({ channel, error, type: payload.type }, 'Delivery failed for channel')
         results.push({
-          channel,
+          channel: channel as NotificationChannel,
           success: false,
           error,
           deliveredAt: new Date().toISOString(),

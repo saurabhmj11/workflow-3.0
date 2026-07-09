@@ -179,6 +179,7 @@ describe('ApprovalStore', () => {
       nodeId: 'node-1',
       workflowId: 'wf-1',
       status: 'pending',
+      context: { mockMode: true, nodeOutputs: {} },
       createdAt: new Date().toISOString(),
     })
     expect(useApprovalStore.getState().requests).toHaveLength(1)
@@ -191,6 +192,7 @@ describe('ApprovalStore', () => {
       nodeId: 'node-1',
       workflowId: 'wf-1',
       status: 'pending',
+      context: { mockMode: true, nodeOutputs: {} },
       createdAt: new Date().toISOString(),
     })
     useApprovalStore.getState().updateStatus('approval-1', 'approved', 'Looks good')
@@ -205,6 +207,7 @@ describe('ApprovalStore', () => {
       nodeId: 'node-1',
       workflowId: 'wf-1',
       status: 'pending',
+      context: { mockMode: true, nodeOutputs: {} },
       createdAt: new Date().toISOString(),
     })
     useApprovalStore.getState().updateStatus('approval-1', 'rejected', 'Not appropriate')
@@ -219,6 +222,7 @@ describe('ApprovalStore', () => {
       nodeId: 'node-1',
       workflowId: 'wf-1',
       status: 'pending',
+      context: { mockMode: true, nodeOutputs: {} },
       createdAt: new Date().toISOString(),
     })
     useApprovalStore.getState().addRequest({
@@ -227,6 +231,7 @@ describe('ApprovalStore', () => {
       nodeId: 'node-2',
       workflowId: 'wf-1',
       status: 'pending',
+      context: { mockMode: true, nodeOutputs: {} },
       createdAt: new Date().toISOString(),
     })
     useApprovalStore.getState().updateStatus('approval-1', 'approved')

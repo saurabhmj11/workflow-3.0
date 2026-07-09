@@ -16,7 +16,7 @@ interface ScheduledJob {
   workflowId: string
   cronExpression: string
   timezone: string
-  task: cron.ScheduledTask | null
+  task: any // cron.ScheduledTask | null depending on the cron version and imports
 }
 
 // ─── State ──────────────────────────────────────
@@ -187,7 +187,7 @@ export function addScheduleJob(
       {
         scheduled: true,
         timezone: timezone !== 'UTC' ? timezone : undefined,
-      }
+      } as any
     )
 
     jobs.set(scheduleId, {

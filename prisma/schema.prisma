@@ -609,3 +609,45 @@ model SiteConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─── Secret Manager ──────────────────────────────
+// Encrypted credentials and API keys for use in workflows
+// Referenced as {{secret.MY_API_KEY}} in workflow configs
+
+model Secret {
+  id          String   @id @default(cuid())
+  name        String   // Human-readable name, e.g., "Stripe API Key"
+  key         String   // Variable name, e.g., "STRIPE_API_KEY"
+  value       String   // Encrypted value (AES-256)
+  description String?
+  category    String   @default("api_key") // api_key, oauth_token, password, certificate, other
+  userId      String?
+  isGlobal    Boolean  @default(false) // Available to all workflows vs. user-specific
+  lastUsedAt  DateTime?
+  usageCount  Int      @default(0)
+  expiresAt   DateTime?
+  tags        String?  // JSON array of tags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@index([isGlobal])
+}
+
+// ─── Workflow Permissions (RBAC) ─────────────────
+// Fine-grained access control per workflow
+
+model WorkflowPermission {
+  id         String   @id @default(cuid())
+  workflowId String
+  userId     String
+  role       String   @default("viewer") // owner, editor, viewer
+  grantedBy  String?  // userId who granted this permission
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([workflowId, userId])
+  @@index([workflowId])
+  @@index([userId])
+}

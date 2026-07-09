@@ -23,17 +23,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+import { auth } from "@/lib/auth";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <SessionProvider>
+        <SessionProvider session={session}>
           <AppLayout>
             {children}
           </AppLayout>

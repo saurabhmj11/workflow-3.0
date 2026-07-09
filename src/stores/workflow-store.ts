@@ -36,7 +36,7 @@ export function flowToNode(node: Node): NodeDefinition {
     type: node.data.nodeType as NodeType,
     label: node.data.label as string,
     category: node.data.category as NodeCategory,
-    config: node.data.config ?? {},
+    config: (node.data.config as Record<string, unknown> | undefined) ?? ({} as Record<string, unknown>),
     position: node.position,
   }
 }

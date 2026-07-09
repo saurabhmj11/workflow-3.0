@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   Zap, LayoutDashboard, Workflow, BarChart3, Activity,
   Plug, Brain, Rocket, FlaskConical, Eye, Layers,
-  Shield, Settings, ChevronRight,
+  Shield, Settings, ChevronRight, KeyRound, Search,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -15,39 +15,27 @@ import { Badge } from '@/components/ui/badge'
 // ─── Navigation Items ───────────────────────────────
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: LayoutDashboard, color: 'text-zinc-400' },
-  { href: '/builder', label: 'Builder', icon: Workflow, color: 'text-violet-400' },
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3, color: 'text-cyan-400' },
-  { href: '/analytics', label: 'Analytics', icon: Activity, color: 'text-emerald-400' },
-  { href: '/integrations', label: 'Integrations', icon: Plug, color: 'text-orange-400' },
-  { href: '/memory', label: 'Memory / CRM', icon: Brain, color: 'text-pink-400' },
-  { href: '/deployments', label: 'Deployments', icon: Rocket, color: 'text-emerald-400' },
-  { href: '/testing', label: 'Testing', icon: FlaskConical, color: 'text-amber-400' },
-  { href: '/observability', label: 'Observability', icon: Eye, color: 'text-violet-400' },
-  { href: '/plugins', label: 'Plugins', icon: Layers, color: 'text-cyan-400' },
-  { href: '/audit', label: 'Audit Trail', icon: Shield, color: 'text-emerald-400' },
-  { href: '/settings', label: 'Settings', icon: Settings, color: 'text-zinc-400' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-cyan-400' },
+  { href: '/build', label: 'Build', icon: Workflow, color: 'text-violet-400' },
+  { href: '/test', label: 'Test', icon: FlaskConical, color: 'text-amber-400' },
+  { href: '/deploy', label: 'Deploy', icon: Rocket, color: 'text-emerald-400' },
+  { href: '/embed', label: 'Embed', icon: Plug, color: 'text-orange-400' },
 ]
 
 // ─── Page Title Map ─────────────────────────────────
 
 export const PAGE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'OpenWorkflow Platform', description: 'Build, deploy, and monitor AI-powered workflows' },
-  '/dashboard': { title: 'AI Employee Dashboard', description: 'Real-time performance metrics' },
-  '/analytics': { title: 'Workflow Analytics', description: 'Cost, performance, and ROI across all AI employees' },
-  '/integrations': { title: 'Integrations', description: 'Connect your tools to power your AI employees' },
-  '/memory': { title: 'Agent Memory Layer', description: 'Customer context & knowledge management' },
-  '/deployments': { title: 'Deployments', description: 'Manage workflow deployments across environments' },
-  '/testing': { title: 'Testing', description: 'Workflow test runner and assertions' },
-  '/observability': { title: 'Observability', description: 'Traces, logs, and platform metrics' },
-  '/plugins': { title: 'Plugins', description: 'Extend OpenWorkflow with custom plugins' },
-  '/audit': { title: 'Audit Trail', description: 'Complete history of all actions' },
-  '/settings': { title: 'Settings', description: 'Manage your account and preferences' },
+  '/dashboard': { title: 'Dashboard', description: 'Real-time performance metrics' },
+  '/build': { title: 'Build', description: 'Workflow Builder' },
+  '/test': { title: 'Test', description: 'Workflow test runner and assertions' },
+  '/deploy': { title: 'Deploy', description: 'Manage workflow deployments across environments' },
+  '/embed': { title: 'Embed', description: 'Embed configurations' },
 }
 
 // ─── Routes that should NOT use AppLayout ───────────
 
-export const EXCLUDED_ROUTES = ['/builder', '/demo', '/login', '/register']
+export const EXCLUDED_ROUTES = ['/', '/build', '/demo', '/login', '/register', '/chat']
 
 // ─── Sidebar Component ──────────────────────────────
 
@@ -56,9 +44,10 @@ interface AppSidebarProps {
   onToggleCollapse: () => void
   mobileOpen: boolean
   onMobileClose: () => void
+  onOpenCommandPalette?: () => void
 }
 
-export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose }: AppSidebarProps) {
+export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose, onOpenCommandPalette }: AppSidebarProps) {
   const pathname = usePathname()
 
   const isActive = (href: string) => {
@@ -70,7 +59,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileCl
     <>
       {/* Logo */}
       <div className="p-4 flex items-center gap-3 border-b border-zinc-800">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-lg bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0">
           <Zap className="h-4 w-4 text-white" />
         </div>
         {!collapsed && (
@@ -81,12 +70,33 @@ export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileCl
         )}
       </div>
 
+      {/* Command Palette Button */}
+      {onOpenCommandPalette && (
+        <div className="px-2 pt-2">
+          <button
+            onClick={onOpenCommandPalette}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-zinc-500 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 transition-colors ${
+              collapsed ? 'justify-center' : ''
+            }`}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left">Search...</span>
+                <kbd className="text-[9px] bg-zinc-700 border border-zinc-600 rounded px-1 py-0.5">⌘K</kbd>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
       <ScrollArea className="flex-1">
         <nav className="p-2 space-y-0.5">
           {NAV_ITEMS.map(item => {
             const Icon = item.icon
             const active = isActive(item.href)
+            const itemWithBadge = item as typeof item & { badge?: string }
             return (
               <Link
                 key={item.href}
@@ -97,7 +107,10 @@ export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileCl
                 }`}
               >
                 <Icon className={`h-4 w-4 shrink-0 ${active ? item.color : item.color}`} />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {!collapsed && itemWithBadge.badge && (
+                  <Badge variant="outline" className="text-[8px] border-amber-500/30 text-amber-400 px-1 py-0 h-4">{itemWithBadge.badge}</Badge>
+                )}
                 {collapsed && (
                   <span className="sr-only">{item.label}</span>
                 )}
@@ -142,7 +155,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileCl
             {/* Close button */}
             <div className="p-4 flex items-center justify-between border-b border-zinc-800">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
                   <Zap className="h-4 w-4 text-white" />
                 </div>
                 <div>

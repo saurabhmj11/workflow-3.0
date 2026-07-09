@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { successResponse, errorResponse, parseNodes, parseEdges } from '@/lib/api-utils'
+import type { NodeDefinition, EdgeDefinition } from '@/lib/types'
 import { getCurrentUserId } from '@/lib/auth-utils'
 
 // ─── GET /api/workflows/[id]/versions/[version] ────
@@ -93,21 +94,8 @@ export async function POST(
     }
 
     const snapshot = JSON.parse(version.snapshot) as {
-      nodes: Array<{
-        id: string
-        type: string
-        label: string
-        category: string
-        config: Record<string, unknown>
-        position: { x: number; y: number }
-      }>
-      edges: Array<{
-        id: string
-        source: string
-        target: string
-        sourceHandle: string
-        targetHandle: string
-      }>
+      nodes: NodeDefinition[]
+      edges: EdgeDefinition[]
     }
 
     // Replace workflow nodes and edges with the snapshot data in a transaction

@@ -125,7 +125,7 @@ function StepWelcome() {
   return (
     <div className="flex flex-col items-center text-center gap-6 py-4">
       {/* Logo */}
-      <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
+      <div className="h-16 w-16 rounded-lg bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
         <Bot className="h-8 w-8 text-white" />
       </div>
 
@@ -133,7 +133,7 @@ function StepWelcome() {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">
           Welcome to{' '}
-          <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+          <span className="bg-linear-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
             OpenWorkflow AI Employees
           </span>
         </h2>
@@ -201,7 +201,7 @@ function StepChoose({
               `}
             >
               {emp.popular && (
-                <Badge className="absolute top-2 right-2 text-[9px] px-1.5 py-0 h-4 bg-gradient-to-r from-violet-500 to-cyan-500 text-white border-0 font-medium">
+                <Badge className="absolute top-2 right-2 text-[9px] px-1.5 py-0 h-4 bg-linear-to-r from-violet-500 to-cyan-500 text-white border-0 font-medium">
                   Popular
                 </Badge>
               )}
@@ -315,7 +315,7 @@ function StepAction() {
       {/* 3-step explanation */}
       <div className="flex flex-col gap-3 w-full max-w-md">
         <div className="flex items-start gap-3 p-4 rounded-xl bg-zinc-900/80 border border-zinc-800">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
+          <div className="h-8 w-8 rounded-full bg-linear-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
             1
           </div>
           <div>
@@ -333,7 +333,7 @@ function StepAction() {
         </div>
 
         <div className="flex items-start gap-3 p-4 rounded-xl bg-zinc-900/80 border border-zinc-800">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
+          <div className="h-8 w-8 rounded-full bg-linear-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
             2
           </div>
           <div>
@@ -351,7 +351,7 @@ function StepAction() {
         </div>
 
         <div className="flex items-start gap-3 p-4 rounded-xl bg-zinc-900/80 border border-zinc-800">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
+          <div className="h-8 w-8 rounded-full bg-linear-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 text-white text-xs font-bold">
             3
           </div>
           <div>
@@ -533,7 +533,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
         <div className="w-full">
           <Progress
             value={progress}
-            className="h-1 rounded-none bg-zinc-800 [&>[data-slot=progress-indicator]]:bg-gradient-to-r [&>[data-slot=progress-indicator]]:from-violet-500 [&>[data-slot=progress-indicator]]:to-cyan-500"
+            className="h-1 rounded-none bg-zinc-800 [&>[data-slot=progress-indicator]]:bg-linear-to-r [&>[data-slot=progress-indicator]]:from-violet-500 [&>[data-slot=progress-indicator]]:to-cyan-500"
           />
         </div>
 
@@ -548,7 +548,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
                     h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-all duration-200
                     ${
                       i === stepIndex
-                        ? 'bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/20'
+                        ? 'bg-linear-to-br from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/20'
                         : i < stepIndex
                           ? 'bg-zinc-700 text-zinc-300 cursor-pointer hover:bg-zinc-600'
                           : 'bg-zinc-800 text-zinc-600'
@@ -621,7 +621,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
             {currentStep.id === 'welcome' && (
               <Button
                 size="sm"
-                className="h-9 gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
+                className="h-9 gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
                 onClick={goNext}
               >
                 Get Started
@@ -632,7 +632,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
             {currentStep.id === 'choose' && (
               <Button
                 size="sm"
-                className="h-9 gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5 disabled:opacity-50"
+                className="h-9 gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5 disabled:opacity-50"
                 onClick={goNext}
                 disabled={isNextDisabled}
               >
@@ -653,7 +653,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
                 </Button>
                 <Button
                   size="sm"
-                  className="h-9 gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
+                  className="h-9 gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
                   onClick={goNext}
                 >
                   Continue
@@ -675,7 +675,7 @@ export function OnboardingWizard({ open, onOpenChange, onComplete, onWatchDemo }
                 </Button>
                 <Button
                   size="sm"
-                  className="h-9 gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
+                  className="h-9 gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white shadow-lg shadow-violet-500/20 px-5"
                   onClick={handleStartBuilding}
                 >
                   <Zap className="h-3.5 w-3.5" />

@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useMemo, useState, useEffect } from 'react'
+import { useCallback, useMemo, useState, useEffect, ReactNode } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { getCategoryForType, type NodeType } from '@/lib/types'
+import { askCopilot } from '@/app/actions/copilot'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useExecutionStore } from '@/stores/execution-store'
 import {
   Select,
   SelectContent,
@@ -27,9 +30,11 @@ import {
   UserCheck, Eye, AlertTriangle,
   Database, Send, Hash, MessageCircle, Plug,
   Plus, Wrench, PlayCircle, Layers,
+  TerminalSquare, Activity, Sparkles, SendHorizontal, Braces,
   type LucideIcon,
 } from 'lucide-react'
 import { ToolBrowser } from '@/components/mcp/tool-browser'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // ─── Icon map (mirrors agent-node.tsx) ──────────
 const TRIGGER_ICONS: Record<string, LucideIcon> = {
@@ -61,7 +66,7 @@ interface ConfigFieldDef {
   placeholder?: string
   options?: { value: string; label: string }[]
   /** For array-object, define the sub-fields */
-  subFields?: { key: string; label: string; type: 'text' | 'textarea' | 'select'; placeholder?: string; options?: { value: string; label: string }[] }[]
+  subFields?: { key: string; label: string; type: 'text' | 'textarea' | 'select' | 'switch'; placeholder?: string; options?: { value: string; label: string }[] }[]
 }
 
 const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
@@ -83,7 +88,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
       { value: 'Asia/Tokyo', label: 'JST (Tokyo)' }, { value: 'Asia/Shanghai', label: 'CST (Shanghai)' },
     ] },
   ],
-  email: [
+  'email-trigger': [
     { key: 'imapServer', label: 'IMAP Server', type: 'text', placeholder: 'imap.gmail.com' },
     { key: 'folder', label: 'Folder', type: 'text', placeholder: 'INBOX' },
   ],
@@ -91,7 +96,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     { key: 'phoneNumber', label: 'Phone Number', type: 'text', placeholder: '+1-555-0142' },
     { key: 'greeting', label: 'Greeting', type: 'textarea', placeholder: 'Hello, how can I help?' },
   ],
-  whatsapp: [
+  'whatsapp-trigger': [
     { key: 'phoneNumber', label: 'Phone Number', type: 'text', placeholder: '+1-555-0142' },
     { key: 'template', label: 'Template', type: 'text', placeholder: 'hello_template' },
   ],
@@ -221,7 +226,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     ] },
     { key: 'fields', label: 'Fields (JSON)', type: 'textarea', placeholder: '{"key": "value"}' },
   ],
-  email: [
+  'email-action': [
     { key: 'to', label: 'To', type: 'text', placeholder: 'user@example.com' },
     { key: 'subject', label: 'Subject', type: 'text', placeholder: 'Notification' },
     { key: 'body', label: 'Body', type: 'textarea', placeholder: 'Email content...' },
@@ -231,7 +236,7 @@ const CONFIG_SCHEMA: Record<string, ConfigFieldDef[]> = {
     { key: 'message', label: 'Message', type: 'textarea', placeholder: 'Hello team!' },
     { key: 'threadTs', label: 'Thread TS', type: 'text', placeholder: '1234567890.123456' },
   ],
-  whatsapp: [
+  'whatsapp-action': [
     { key: 'to', label: 'To', type: 'text', placeholder: '+1-555-0142' },
     { key: 'template', label: 'Template', type: 'text', placeholder: 'hello_template' },
     { key: 'parameters', label: 'Parameters (JSON)', type: 'textarea', placeholder: '{"name": "John"}' },
@@ -278,20 +283,59 @@ function WorkflowSelectField({ value, onChange }: { value: string; onChange: (v:
 
   return (
     <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger className="h-7 text-xs bg-zinc-950 border-zinc-700 text-zinc-200 focus:ring-zinc-600 w-full">
+      <SelectTrigger className="h-10 text-sm bg-background border border-input text-foreground rounded-md w-full">
         <SelectValue placeholder={wfLoading ? 'Loading workflows...' : 'Select a workflow...'} />
       </SelectTrigger>
-      <SelectContent className="bg-zinc-900 border-zinc-700">
+      <SelectContent className="bg-background border border-border rounded-md shadow-md">
         {workflows.length === 0 && !wfLoading && (
-          <div className="px-2 py-1.5 text-xs text-zinc-500">No workflows found</div>
+          <div className="px-3 py-2 text-sm text-muted-foreground text-center">No workflows found</div>
         )}
         {workflows.map((wf) => (
-          <SelectItem key={wf.id} value={wf.id} className="text-xs text-zinc-200 focus:bg-zinc-800 focus:text-zinc-100">
+          <SelectItem key={wf.id} value={wf.id} className="text-sm cursor-pointer my-1">
             {wf.name}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+// ─── Variable Picker ────────────────────────────
+
+function VariablePicker({ onSelect, nodes, currentNodeId }: { onSelect: (v: string) => void, nodes: any[], currentNodeId: string }) {
+  const availableNodes = nodes.filter(n => n.id !== currentNodeId)
+  
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-blue-500" title="Insert Variable">
+          <Braces className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0 shadow-lg" align="end" side="bottom">
+        <div className="p-2 text-xs font-semibold text-muted-foreground border-b border-border bg-muted/30">
+          Insert Variable from Previous Nodes
+        </div>
+        <ScrollArea className="h-48">
+          <div className="p-1 flex flex-col gap-1">
+            {availableNodes.length === 0 ? (
+              <div className="p-3 text-xs text-muted-foreground text-center">No previous nodes available.</div>
+            ) : (
+              availableNodes.map(n => (
+                <Button 
+                  key={n.id} 
+                  variant="ghost" 
+                  className="justify-start text-xs h-8 px-2 font-mono hover:bg-blue-50 hover:text-blue-600" 
+                  onClick={() => onSelect(`{{${n.id}.output}}`)}
+                >
+                  <span className="truncate">{n.label || n.type}</span>
+                </Button>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -302,23 +346,36 @@ function ConfigField({
   value,
   onChange,
   onBrowseTools,
+  nodes,
+  currentNodeId,
 }: {
   field: ConfigFieldDef
   value: unknown
   onChange: (key: string, value: unknown) => void
   onBrowseTools?: () => void
+  nodes: any[]
+  currentNodeId: string
 }) {
   const strVal = value != null ? String(value) : ''
 
   switch (field.type) {
     case 'text':
       return (
-        <Input
-          value={strVal}
-          onChange={(e) => onChange(field.key, e.target.value)}
-          placeholder={field.placeholder}
-          className="h-7 text-xs bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
-        />
+        <div className="relative flex items-center">
+          <Input
+            value={strVal}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            placeholder={field.placeholder}
+            className="h-10 text-sm bg-background border-input text-foreground placeholder:text-muted-foreground rounded-md pr-8"
+          />
+          <div className="absolute right-1">
+            <VariablePicker
+              nodes={nodes}
+              currentNodeId={currentNodeId}
+              onSelect={(v) => onChange(field.key, strVal + v)}
+            />
+          </div>
+        </div>
       )
 
     case 'number':
@@ -331,30 +388,39 @@ function ConfigField({
             onChange(field.key, v === '' ? '' : Number(v))
           }}
           placeholder={field.placeholder}
-          className="h-7 text-xs bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
+          className="h-10 text-sm bg-background border-input text-foreground placeholder:text-muted-foreground rounded-md"
         />
       )
 
     case 'textarea':
       return (
-        <Textarea
-          value={strVal}
-          onChange={(e) => onChange(field.key, e.target.value)}
-          placeholder={field.placeholder}
-          rows={3}
-          className="text-xs bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600 min-h-[60px] resize-y"
-        />
+        <div className="relative">
+          <Textarea
+            value={strVal}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            placeholder={field.placeholder}
+            rows={3}
+            className="text-sm bg-background border-input text-foreground placeholder:text-muted-foreground rounded-md min-h-[80px] resize-y pr-8"
+          />
+          <div className="absolute top-1 right-1">
+            <VariablePicker
+              nodes={nodes}
+              currentNodeId={currentNodeId}
+              onSelect={(v) => onChange(field.key, strVal + v)}
+            />
+          </div>
+        </div>
       )
 
     case 'select':
       return (
         <Select value={strVal || undefined} onValueChange={(v) => onChange(field.key, v)}>
-          <SelectTrigger className="h-7 text-xs bg-zinc-950 border-zinc-700 text-zinc-200 focus:ring-zinc-600 w-full">
+          <SelectTrigger className="h-10 text-sm bg-background border-input text-foreground rounded-md w-full">
             <SelectValue placeholder={field.placeholder ?? 'Select...'} />
           </SelectTrigger>
-          <SelectContent className="bg-zinc-900 border-zinc-700">
+          <SelectContent className="bg-background border-border rounded-md shadow-md">
             {field.options?.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="text-xs text-zinc-200 focus:bg-zinc-800 focus:text-zinc-100">
+              <SelectItem key={opt.value} value={opt.value} className="text-sm cursor-pointer my-1">
                 {opt.label}
               </SelectItem>
             ))}
@@ -376,9 +442,9 @@ function ConfigField({
     case 'array-string': {
       const arr = (Array.isArray(value) ? value : []) as string[]
       return (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {arr.map((item, i) => (
-            <div key={i} className="flex items-center gap-1">
+            <div key={i} className="flex items-center gap-2 relative">
               <Input
                 value={item}
                 onChange={(e) => {
@@ -387,29 +453,40 @@ function ConfigField({
                   onChange(field.key, next)
                 }}
                 placeholder={field.placeholder}
-                className="h-6 text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 flex-1 focus-visible:ring-zinc-600"
+                className="h-10 text-sm font-medium bg-background border border-border text-foreground placeholder:text-slate-300 flex-1 rounded-lg focus-visible:ring-slate-400 focus-visible:border-slate-400 hover:border-slate-300 transition-colors pr-8"
               />
+              <div className="absolute right-12">
+                <VariablePicker
+                  nodes={nodes}
+                  currentNodeId={currentNodeId}
+                  onSelect={(v) => {
+                    const next = [...arr]
+                    next[i] = String(next[i] || '') + v
+                    onChange(field.key, next)
+                  }}
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-lg border-2 border-transparent hover:border-red-200 transition-all"
                 onClick={() => {
                   const next = arr.filter((_, idx) => idx !== i)
                   onChange(field.key, next)
                 }}
               >
-                <X className="h-3 w-3" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
           ))}
           <Button
             variant="outline"
             size="sm"
-            className="h-6 text-[10px] border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-full"
+            className="h-10 text-sm font-medium border border-border text-muted-foreground hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 w-full rounded-lg transition-all border-dashed"
             onClick={() => onChange(field.key, [...arr, ''])}
           >
-            <Plus className="h-3 w-3 mr-1" />
-            Add Item
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Item
           </Button>
         </div>
       )
@@ -460,28 +537,54 @@ function ConfigField({
                       </SelectContent>
                     </Select>
                   ) : sf.type === 'textarea' ? (
-                    <Textarea
-                      value={String(item[sf.key] ?? '')}
-                      onChange={(e) => {
-                        const next = [...arr]
-                        next[i] = { ...next[i], [sf.key]: e.target.value }
-                        onChange(field.key, next)
-                      }}
-                      placeholder={sf.placeholder}
-                      rows={2}
-                      className="text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 min-h-[40px] resize-y"
-                    />
+                    <div className="relative">
+                      <Textarea
+                        value={String(item[sf.key] ?? '')}
+                        onChange={(e) => {
+                          const next = [...arr]
+                          next[i] = { ...next[i], [sf.key]: e.target.value }
+                          onChange(field.key, next)
+                        }}
+                        placeholder={sf.placeholder}
+                        rows={2}
+                        className="text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 min-h-[40px] resize-y pr-8"
+                      />
+                      <div className="absolute top-1 right-1">
+                        <VariablePicker
+                          nodes={nodes}
+                          currentNodeId={currentNodeId}
+                          onSelect={(v) => {
+                            const next = [...arr]
+                            next[i] = { ...next[i], [sf.key]: String(item[sf.key] ?? '') + v }
+                            onChange(field.key, next)
+                          }}
+                        />
+                      </div>
+                    </div>
                   ) : (
-                    <Input
-                      value={String(item[sf.key] ?? '')}
-                      onChange={(e) => {
-                        const next = [...arr]
-                        next[i] = { ...next[i], [sf.key]: e.target.value }
-                        onChange(field.key, next)
-                      }}
-                      placeholder={sf.placeholder}
-                      className="h-6 text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
-                    />
+                    <div className="relative flex items-center">
+                      <Input
+                        value={String(item[sf.key] ?? '')}
+                        onChange={(e) => {
+                          const next = [...arr]
+                          next[i] = { ...next[i], [sf.key]: e.target.value }
+                          onChange(field.key, next)
+                        }}
+                        placeholder={sf.placeholder}
+                        className="h-6 text-[11px] bg-zinc-950 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600 pr-8"
+                      />
+                      <div className="absolute right-1">
+                        <VariablePicker
+                          nodes={nodes}
+                          currentNodeId={currentNodeId}
+                          onSelect={(v) => {
+                            const next = [...arr]
+                            next[i] = { ...next[i], [sf.key]: String(item[sf.key] ?? '') + v }
+                            onChange(field.key, next)
+                          }}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
@@ -592,10 +695,45 @@ export function NodeConfigPanel() {
   const removeNode = useWorkflowStore((s) => s.removeNode)
   const [toolBrowserOpen, setToolBrowserOpen] = useState(false)
 
+  // Copilot State
+  const [copilotInput, setCopilotInput] = useState('')
+  const [copilotMessages, setCopilotMessages] = useState<{id: string, role: 'user' | 'assistant', display: ReactNode}[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const activeResultId = useExecutionStore((s) => s.activeResultId)
+  const results = useExecutionStore((s) => s.results)
+
+  const executionStep = useMemo(() => {
+    if (!selectedNodeId || !activeResultId) return null
+    const run = results.find(r => r.runId === activeResultId)
+    if (!run) return null
+    return run.steps.find(s => s.nodeId === selectedNodeId) || null
+  }, [selectedNodeId, activeResultId, results])
+
   const node = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId),
     [nodes, selectedNodeId]
   )
+
+  const handleCopilotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!copilotInput.trim() || isGenerating || !node || !selectedNodeId) return
+    const input = copilotInput
+    setCopilotInput('')
+    
+    const userMsgId = Date.now().toString()
+    setCopilotMessages(prev => [...prev, { id: userMsgId, role: 'user', display: <div className="text-xs text-zinc-200">{input}</div> }])
+    
+    setIsGenerating(true)
+    try {
+      const response = await askCopilot(input, node.type, node.config)
+      setCopilotMessages(prev => [...prev, { id: response.id, role: 'assistant', display: response.display }])
+    } catch (err) {
+      setCopilotMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', display: <div className="text-xs text-red-400">Error generating response.</div> }])
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const cat = useMemo(
     () => node ? getCategoryForType(node.type) : null,
@@ -603,7 +741,12 @@ export function NodeConfigPanel() {
   )
 
   const schema = useMemo(
-    () => node ? (CONFIG_SCHEMA[node.type] ?? []) : [],
+    () => {
+      if (!node) return []
+      if (node.type === 'email') return node.category === 'trigger' ? CONFIG_SCHEMA['email-trigger'] : CONFIG_SCHEMA['email-action']
+      if (node.type === 'whatsapp') return node.category === 'trigger' ? CONFIG_SCHEMA['whatsapp-trigger'] : CONFIG_SCHEMA['whatsapp-action']
+      return CONFIG_SCHEMA[node.type] ?? []
+    },
     [node]
   )
 
@@ -671,67 +814,250 @@ export function NodeConfigPanel() {
   if (!node || !cat) return null
 
   return (
-    <div className="h-full flex flex-col bg-zinc-900/80">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="p-3 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className={`h-6 w-6 rounded flex items-center justify-center ${cat.bgColor} border ${cat.borderColor}`}>
-              <Icon className={`h-3 w-3 ${cat.color}`} />
+      <div className="p-4 border-b border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${cat.bgColor} border  shadow-sm`}>
+              <Icon className={`h-6 w-6 ${cat.color}`} />
             </div>
-            <Badge variant="outline" className={`text-[10px] ${cat.borderColor} ${cat.color}`}>
+            <Badge variant="outline" className={`text-sm px-3 py-1 font-medium border-2 rounded-md ${cat.borderColor} ${cat.color} bg-background shadow-sm`}>
               {cat.label}
             </Badge>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 shrink-0"
+            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-md shrink-0 transition-colors"
             onClick={() => selectNode(null)}
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
         {/* Editable Label */}
-        <Input
-          value={node.label}
-          onChange={(e) => handleLabelChange(e.target.value)}
-          className="h-7 text-sm font-medium bg-zinc-950 border-zinc-700 text-zinc-100 focus-visible:ring-zinc-600"
-        />
-        <p className="text-[10px] text-zinc-600 mt-1.5 font-mono">
-          type: {node.type} · id: {node.id.slice(0, 16)}...
-        </p>
+        <div className="space-y-1">
+          <Input
+            value={node.label}
+            onChange={(e) => handleLabelChange(e.target.value)}
+            className="h-12 text-lg font-medium bg-background border border-blue-200 text-blue-700 focus-visible:ring-1 focus-visible:ring-ring rounded-lg  transition-colors"
+          />
+        </div>
       </div>
 
-      {/* Config Fields */}
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">
-          {schema.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-zinc-500">
-              <p className="text-xs">No configurable fields</p>
-              <p className="text-[10px] opacity-60">This node type has no config schema</p>
-            </div>
-          )}
-
-          {schema.map((field, i) => (
-            <div key={field.key}>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                  {field.label}
-                </Label>
-                <ConfigField
-                  field={field}
-                  value={node.config[field.key]}
-                  onChange={handleConfigChange}
-                  onBrowseTools={field.type === 'tools-tag' ? () => setToolBrowserOpen(true) : undefined}
-                />
-              </div>
-              {i < schema.length - 1 && <Separator className="mt-3 bg-zinc-800/50" />}
-            </div>
-          ))}
+      {/* Config Fields & Inspector Tabs */}
+      <Tabs defaultValue="config" className="flex-1 flex flex-col min-h-0 bg-background">
+        <div className="px-4 pt-4 shrink-0">
+          <TabsList className="w-full h-14 bg-muted border border-border flex rounded-lg p-1 gap-1 shadow-inner">
+            <TabsTrigger value="config" className="flex-1 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-muted-foreground hover:text-foreground transition-all">
+              <Wrench className="w-4 h-4 mr-2" />
+              Settings
+            </TabsTrigger>
+            <TabsTrigger value="copilot" className="flex-1 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:text-violet-600 data-[state=active]:shadow-sm text-muted-foreground hover:text-foreground transition-all">
+              <Sparkles className="w-4 h-4 mr-2 text-violet-500" />
+              Magic Helper
+            </TabsTrigger>
+            <TabsTrigger value="inspector" className="flex-1 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-muted-foreground hover:text-foreground transition-all relative">
+              <Eye className="w-4 h-4 mr-2" />
+              Look Inside
+              {executionStep?.status === 'running' && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-sm" />
+              )}
+              {executionStep?.status === 'error' && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 shadow-sm" />
+              )}
+              {executionStep?.status === 'success' && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-500 shadow-sm" />
+              )}
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </ScrollArea>
+
+        <TabsContent value="config" className="flex-1 min-h-0 m-0 border-none p-0 outline-none flex flex-col data-[state=active]:flex">
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-5">
+              {schema.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-background border border-dashed border-border rounded-md m-2">
+                  <p className="text-lg font-medium text-muted-foreground">Nothing to change here!</p>
+                  <p className="text-sm font-medium mt-1">This block is already perfect.</p>
+                </div>
+              )}
+
+              {schema.map((field, i) => (
+                <div key={field.key} className="bg-background p-4 rounded-md border border-border shadow-sm hover:border-border transition-colors">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                      {field.label}
+                    </Label>
+                    <ConfigField
+                      field={field}
+                      value={node.config[field.key]}
+                      onChange={handleConfigChange}
+                      onBrowseTools={field.type === 'tools-tag' ? () => setToolBrowserOpen(true) : undefined}
+                      nodes={nodes}
+                      currentNodeId={selectedNodeId!}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="copilot" className="flex-1 min-h-0 m-0 border-none p-0 outline-none flex flex-col data-[state=active]:flex bg-violet-50/50 relative">
+          <ScrollArea className="flex-1 p-3">
+            <div 
+              className="space-y-4 pb-16"
+              onClick={(e) => {
+                const target = e.target as HTMLElement
+                const btn = target.closest('.apply-config-btn')
+                if (btn && selectedNodeId) {
+                  const configStr = btn.getAttribute('data-config')
+                  if (configStr) {
+                    try {
+                      const config = JSON.parse(configStr)
+                      Object.keys(config).forEach(k => {
+                        updateNodeConfig(selectedNodeId, { [k]: config[k] })
+                      })
+                      // Visual feedback could be added here
+                    } catch (err) {}
+                  }
+                }
+              }}
+            >
+              {copilotMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground space-y-2">
+                  <Sparkles className="w-8 h-8 opacity-40 text-violet-500" />
+                  <p className="text-sm font-medium">Configure with AI</p>
+                  <p className="text-xs opacity-80 text-center px-4">Describe what you want this node to do, and I'll generate the configuration for you.</p>
+                </div>
+              )}
+              {copilotMessages.map(msg => (
+                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[90%] rounded-lg px-4 py-3 shadow-sm ${
+                    msg.role === 'user' ? 'bg-violet-500 border-2 border-violet-600 text-white font-medium' : 'bg-background border-2 border-border text-foreground'
+                  }`}>
+                    {msg.display}
+                  </div>
+                </div>
+              ))}
+              {isGenerating && (
+                <div className="flex items-center gap-1.5 text-violet-500 text-sm font-medium px-1">
+                  <Sparkles className="w-4 h-4 animate-pulse text-violet-500" />
+                  Thinking...
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          
+          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-violet-50 via-violet-50 to-transparent">
+            <form onSubmit={handleCopilotSubmit} className="relative">
+              <Input
+                value={copilotInput}
+                onChange={e => setCopilotInput(e.target.value)}
+                placeholder="E.g. Set up a webhook..."
+                className="h-12 text-sm font-medium pr-12 bg-background border border-violet-200 focus-visible:ring-violet-400 rounded-lg"
+                disabled={isGenerating}
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                disabled={isGenerating || !copilotInput.trim()}
+                className="absolute right-1 top-1 h-10 w-10 text-violet-400 hover:text-violet-600 hover:bg-violet-100 rounded-md"
+              >
+                <SendHorizontal className="w-5 h-5" />
+              </Button>
+            </form>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="inspector" className="flex-1 min-h-0 m-0 border-none p-0 outline-none flex flex-col data-[state=active]:flex bg-background">
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {!executionStep ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground space-y-3 bg-background border border-dashed border-border rounded-md m-2">
+                  <Activity className="w-10 h-10 opacity-40 text-blue-500" />
+                  <p className="text-sm font-medium">No execution data</p>
+                  <p className="text-xs opacity-80 text-center px-4 font-medium">Run the workflow to see inputs and outputs for this block.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Status Indicator */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-md shadow-inner ${
+                        executionStep.status === 'success' ? 'bg-emerald-500' :
+                        executionStep.status === 'error' ? 'bg-red-500' :
+                        executionStep.status === 'running' ? 'bg-blue-500 animate-pulse' :
+                        'bg-slate-400'
+                      }`} />
+                      <span className="text-sm font-medium text-foreground capitalize">{executionStep.status}</span>
+                    </div>
+                    {executionStep.finishedAt && executionStep.startedAt && (
+                      <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-lg">
+                        {new Date(executionStep.finishedAt).getTime() - new Date(executionStep.startedAt).getTime()}ms
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Error if any */}
+                  {executionStep.error && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-red-500 uppercase flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" /> Error
+                      </Label>
+                      <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700 font-mono wrap-break-word whitespace-pre-wrap">
+                        {executionStep.error}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Input */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase">Input Data</Label>
+                    <div className="p-3 rounded-lg border border-border bg-background text-sm text-foreground font-mono overflow-x-auto shadow-sm">
+                      <pre>{JSON.stringify(executionStep.input, null, 2)}</pre>
+                    </div>
+                  </div>
+
+                  {/* Output */}
+                  {executionStep.output && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase">Output Data</Label>
+                      <div className="p-3 rounded-lg border border-border bg-background text-sm text-foreground font-mono overflow-x-auto shadow-sm">
+                        <pre>{JSON.stringify(executionStep.output, null, 2)}</pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Token Usage (if AI) */}
+                  {executionStep.tokenUsage && (
+                    <div className="flex gap-4 p-3 rounded-lg border border-border bg-background shadow-sm">
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Prompt</div>
+                        <div className="text-sm font-semibold text-foreground">{executionStep.tokenUsage.prompt}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Completion</div>
+                        <div className="text-sm font-semibold text-foreground">{executionStep.tokenUsage.completion}</div>
+                      </div>
+                      {executionStep.costUsd !== undefined && (
+                        <div>
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Cost</div>
+                          <div className="text-sm font-semibold text-emerald-500">${executionStep.costUsd.toFixed(4)}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
 
       {/* Tool Browser Dialog */}
       <ToolBrowser
@@ -742,15 +1068,15 @@ export function NodeConfigPanel() {
       />
 
       {/* Footer */}
-      <div className="p-3 border-t border-zinc-800 shrink-0">
+      <div className="p-4 border-t border-border bg-background shrink-0">
         <Button
           variant="destructive"
-          size="sm"
-          className="w-full h-7 text-xs gap-1.5 bg-red-600/80 hover:bg-red-600 text-white"
+          size="lg"
+          className="w-full h-14 rounded-lg font-medium text-lg bg-red-400 hover:bg-red-500 text-white border-b border-red-600 hover:border-b-0 hover:translate-y-1 transition-all"
           onClick={handleDelete}
         >
-          <Trash2 className="h-3 w-3" />
-          Delete Node
+          <Trash2 className="h-6 w-6 mr-2" />
+          Throw in Trash
         </Button>
       </div>
     </div>

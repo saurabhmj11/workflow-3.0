@@ -417,7 +417,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
         break
       }
 
-      case 'navigate' && typeof action.data === 'string' ? 'navigate' : 'navigate': {
+      case 'navigate': {
         if (typeof action.data === 'string') {
           window.location.href = action.data
         }
@@ -452,7 +452,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
       <DialogContent className="bg-zinc-900 border-zinc-800 max-w-lg h-[650px] flex flex-col p-0 gap-0">
         <DialogHeader className="px-4 py-3 border-b border-zinc-800 shrink-0">
           <DialogTitle className="text-sm text-zinc-100 flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
+            <div className="h-6 w-6 rounded-md bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
               <Sparkles className="h-3 w-3 text-white" />
             </div>
             OpenWorkflow Copilot
@@ -467,7 +467,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
           {messages.map((msg) => (
             <div key={msg.id} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}>
               {msg.role === 'assistant' && (
-                <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="h-6 w-6 rounded-md bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot className="h-3 w-3 text-white" />
                 </div>
               )}
@@ -517,7 +517,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
                 {msg.workflowAction && (
                   <Button
                     size="sm"
-                    className={`mt-2 h-7 text-[10px] gap-1.5 bg-gradient-to-r ${getActionColor(msg.workflowAction.type)} text-white`}
+                    className={`mt-2 h-7 text-[10px] gap-1.5 bg-linear-to-r ${getActionColor(msg.workflowAction.type)} text-white`}
                     onClick={() => handleAction(msg.workflowAction)}
                   >
                     {getActionIcon(msg.workflowAction.type)}
@@ -536,7 +536,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
 
           {loading && (
             <div className="flex gap-2.5">
-              <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0">
+              <div className="h-6 w-6 rounded-md bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0">
                 <Bot className="h-3 w-3 text-white" />
               </div>
               <div className="rounded-lg p-3 bg-zinc-800/50 border border-zinc-700/50">
@@ -576,7 +576,7 @@ export function CopilotPanel({ open, onOpenChange }: { open: boolean; onOpenChan
             />
             <Button
               size="icon"
-              className="h-8 w-8 shrink-0 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
+              className="h-8 w-8 shrink-0 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
               onClick={() => handleSend()}
               disabled={loading || !input.trim()}
             >

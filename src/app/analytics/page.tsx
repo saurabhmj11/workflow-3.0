@@ -179,7 +179,7 @@ function ROICalculator() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 mb-6">
+      <div className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 mb-6">
         <Database className="h-12 w-12 text-slate-600" />
       </div>
       <h2 className="text-xl font-semibold text-white mb-2">No execution data yet</h2>
@@ -187,7 +187,7 @@ function EmptyState() {
         Run a workflow to see real analytics here. Metrics will be computed from your actual execution results.
       </p>
       <div className="flex gap-3">
-        <Link href="/builder">
+        <Link href="/build">
           <Button className="bg-violet-600 hover:bg-violet-700">
             <Zap className="h-4 w-4 mr-2" />
             Build a Workflow
@@ -569,7 +569,7 @@ export default function AnalyticsPage() {
                               <div className="w-28 text-sm text-slate-300 font-medium">{node.type}</div>
                               <div className="flex-1 bg-slate-800/50 rounded-full h-6 overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all"
+                                  className="h-full rounded-full bg-linear-to-r from-violet-500 to-cyan-500 transition-all"
                                   style={{ width: `${Math.max(node.percentage, 1)}%` }}
                                 />
                               </div>
@@ -665,7 +665,7 @@ export default function AnalyticsPage() {
                             <div className="w-48 text-sm text-slate-300 truncate" title={reason.reason}>{reason.reason}</div>
                             <div className="flex-1 bg-slate-800/50 rounded-full h-6 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-red-500"
+                                className="h-full rounded-full bg-linear-to-r from-amber-500 to-red-500"
                                 style={{ width: `${reason.percentage}%` }}
                               />
                             </div>

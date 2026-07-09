@@ -132,7 +132,7 @@ describe('AppSidebar', () => {
 
 describe('PAGE_META', () => {
   it('has metadata for all main routes', () => {
-    const expectedRoutes = ['/', '/dashboard', '/analytics', '/integrations', '/memory', '/deployments', '/testing', '/observability', '/plugins', '/audit', '/settings']
+    const expectedRoutes = ['/', '/dashboard', '/analytics', '/integrations', '/memory', '/deploy', '/test', '/observability', '/plugins', '/audit', '/settings']
     for (const route of expectedRoutes) {
       expect(PAGE_META[route]).toBeDefined()
       expect(PAGE_META[route].title).toBeTruthy()
@@ -145,7 +145,7 @@ describe('PAGE_META', () => {
 
 describe('EXCLUDED_ROUTES', () => {
   it('excludes builder, demo, login, and register', () => {
-    expect(EXCLUDED_ROUTES).toContain('/builder')
+    expect(EXCLUDED_ROUTES).toContain('/build')
     expect(EXCLUDED_ROUTES).toContain('/demo')
     expect(EXCLUDED_ROUTES).toContain('/login')
     expect(EXCLUDED_ROUTES).toContain('/register')
@@ -170,7 +170,7 @@ describe('AppLayout', () => {
   })
 
   it('excludes layout for builder route', () => {
-    mockPathname.mockReturnValue('/builder')
+    mockPathname.mockReturnValue('/build')
     render(
       <AppLayout>
         <div data-testid="builder-content">Builder Content</div>

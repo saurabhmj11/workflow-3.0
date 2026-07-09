@@ -172,21 +172,24 @@ export function MarketplacePanel({ open, onOpenChange }: { open: boolean; onOpen
     if (template) {
       // Load the template
       reset()
-      for (const node of template.nodes) {
+      const nodeIds = template.nodes.map(() => crypto.randomUUID())
+      
+      template.nodes.forEach((node, i) => {
         addNode({
-          id: node.id,
+          id: nodeIds[i],
           type: node.type as 'api',
           label: node.label,
           category: node.category as 'trigger',
           config: node.config ?? {},
-          position: { x: 0, y: 0 },
+          position: node.position || { x: 0, y: 0 },
         })
-      }
+      })
+
       for (const edge of template.edges) {
         addEdge({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
+          id: crypto.randomUUID(),
+          source: nodeIds[edge.sourceIndex],
+          target: nodeIds[edge.targetIndex],
           sourceHandle: edge.sourceHandle as 'default',
           targetHandle: edge.targetHandle as 'input',
         })
@@ -205,7 +208,7 @@ export function MarketplacePanel({ open, onOpenChange }: { open: boolean; onOpen
       <DialogContent className="bg-zinc-900 border-zinc-800 max-w-2xl h-[600px] flex flex-col p-0 gap-0">
         <DialogHeader className="px-4 py-3 border-b border-zinc-800 shrink-0">
           <DialogTitle className="text-sm text-zinc-100 flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
+            <div className="h-6 w-6 rounded-md bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
               <Star className="h-3 w-3 text-white" />
             </div>
             AI Employee Marketplace
@@ -253,7 +256,7 @@ export function MarketplacePanel({ open, onOpenChange }: { open: boolean; onOpen
               <div key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 transition-all p-4">
                 <div className="flex gap-4">
                   {/* Icon */}
-                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br ${item.gradient} flex items-center justify-center shrink-0 shadow-lg`}>
+                  <div className={`h-12 w-12 rounded-lg bg-linear-to-br ${item.gradient} flex items-center justify-center shrink-0 shadow-lg`}>
                     <item.icon className="h-6 w-6 text-white" />
                   </div>
 
@@ -297,7 +300,7 @@ export function MarketplacePanel({ open, onOpenChange }: { open: boolean; onOpen
                       </div>
                       <Button
                         size="sm"
-                        className="h-7 text-[10px] gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
+                        className="h-7 text-[10px] gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
                         onClick={() => handleInstall(item)}
                       >
                         <Download className="h-3 w-3" />

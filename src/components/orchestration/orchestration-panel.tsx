@@ -329,7 +329,7 @@ export function AgentOrchestrationPanel() {
 
               {/* Start Button */}
               <Button
-                className="w-full h-8 gap-1.5 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
+                className="w-full h-8 gap-1.5 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white"
                 onClick={startOrchestration}
                 disabled={running || !task.trim() || agents.length === 0}
               >

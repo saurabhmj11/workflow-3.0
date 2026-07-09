@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest) {
     const body = await req.json()
     const { name, image } = body
 
-    const updateData: { name?: string; image?: string } = {}
+    const updateData: { name?: string | null; image?: string | null } = {}
     if (typeof name === 'string') updateData.name = name.trim() || null
     if (typeof image === 'string') updateData.image = image.trim() || null
 

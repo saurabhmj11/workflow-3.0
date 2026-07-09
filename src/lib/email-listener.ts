@@ -94,6 +94,8 @@ export function decryptPassword(encrypted: string): string {
       decrypted += decipher.final('utf8')
       return decrypted
     }
+    // Return encrypted if it doesn't match known formats
+    return encrypted
   } catch (err) {
     // Fallback: try base64
     try {
@@ -201,7 +203,7 @@ async function fetchNewEmails(config: EmailListenerConfig, lastSeenIds: Set<stri
     const lock = await client.getMailboxLock(config.mailbox)
     try {
       // Search for unread messages (last 50 max for safety)
-      const messageCount = await client.messageSearch({ unseen: true })
+      const messageCount = await (client as any).search({ unseen: true })
       const messagesToFetch = messageCount.slice(0, 50)
 
       log.info({ unseen: messageCount.length, fetching: messagesToFetch.length }, 'Found unseen messages')

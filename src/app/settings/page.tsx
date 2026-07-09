@@ -55,6 +55,7 @@ import {
   EyeOff,
   Monitor,
   Loader2,
+  Palette,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -92,6 +93,14 @@ interface ApiKeyData {
   keyPrefix: string
   lastUsedAt: string | null
   createdAt: string
+}
+
+interface WhitelabelData {
+  companyName: string
+  logoUrl: string
+  primaryColor: string
+  customDomain: string
+  removeOpenWorkflowBranding: boolean
 }
 
 // ─── Profile Tab ────────────────────────────────────
@@ -171,7 +180,7 @@ function ProfileTab() {
         {/* Avatar */}
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
-            <AvatarFallback className="bg-gradient-to-br from-violet-600 to-cyan-500 text-white text-xl font-semibold">
+            <AvatarFallback className="bg-linear-to-br from-violet-600 to-cyan-500 text-white text-xl font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -966,6 +975,146 @@ function ApiKeysTab() {
   )
 }
 
+// ─── Whitelabel Tab ─────────────────────────────────
+
+function WhitelabelTab() {
+  const [config, setConfig] = useState<WhitelabelData>({
+    companyName: '',
+    logoUrl: '',
+    primaryColor: '#06b6d4',
+    customDomain: '',
+    removeOpenWorkflowBranding: false,
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/settings/whitelabel')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.ok && json.data) setConfig(json.data)
+      })
+      .catch(() => toast({ title: 'Failed to load whitelabel settings', variant: 'destructive' }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = useCallback(async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/settings/whitelabel', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+      const json = await res.json()
+      if (json.ok) {
+        toast({ title: 'Whitelabel settings saved' })
+      } else {
+        toast({ title: 'Failed to save', description: json.error, variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Failed to save', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }, [config])
+
+  if (loading) {
+    return (
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardContent className="p-6 flex items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="bg-zinc-900 border-zinc-800">
+      <CardHeader>
+        <CardTitle className="text-zinc-100">Whitelabel Settings</CardTitle>
+        <CardDescription className="text-zinc-500">Customize the platform appearance and branding for your clients</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="companyName" className="text-zinc-300">Company Name</Label>
+          <Input
+            id="companyName"
+            value={config.companyName}
+            onChange={(e) => setConfig({ ...config, companyName: e.target.value })}
+            placeholder="Your Company Inc."
+            className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="logoUrl" className="text-zinc-300">Logo URL</Label>
+          <Input
+            id="logoUrl"
+            value={config.logoUrl}
+            onChange={(e) => setConfig({ ...config, logoUrl: e.target.value })}
+            placeholder="https://example.com/logo.png"
+            className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="primaryColor" className="text-zinc-300">Primary Brand Color (Hex)</Label>
+          <div className="flex items-center gap-3">
+            <Input
+              id="primaryColor"
+              value={config.primaryColor}
+              onChange={(e) => setConfig({ ...config, primaryColor: e.target.value })}
+              placeholder="#06b6d4"
+              className="bg-zinc-800 border-zinc-700 text-zinc-100 font-mono"
+            />
+            <div 
+              className="h-10 w-10 rounded-md border border-zinc-700 shrink-0" 
+              style={{ backgroundColor: config.primaryColor }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="customDomain" className="text-zinc-300">Custom Domain</Label>
+          <Input
+            id="customDomain"
+            value={config.customDomain}
+            onChange={(e) => setConfig({ ...config, customDomain: e.target.value })}
+            placeholder="workflows.yourcompany.com"
+            className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+          />
+          <p className="text-xs text-zinc-500">Requires CNAME record pointing to our servers.</p>
+        </div>
+
+        <Separator className="bg-zinc-800" />
+        
+        <div className="flex items-center justify-between py-3">
+          <div className="space-y-0.5">
+            <Label className="text-zinc-200">Remove OpenWorkflow Branding</Label>
+            <p className="text-xs text-zinc-500">Hide all &apos;Powered by OpenWorkflow&apos; badges and links</p>
+          </div>
+          <Switch
+            checked={config.removeOpenWorkflowBranding}
+            onCheckedChange={(v) => setConfig({ ...config, removeOpenWorkflowBranding: v })}
+          />
+        </div>
+
+        <div className="pt-4">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-cyan-600 hover:bg-cyan-500 text-white"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Save Whitelabel Settings
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Main Settings Page ────────────────────────────
 
 function SettingsContent() {
@@ -1008,6 +1157,13 @@ function SettingsContent() {
               <Key className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">API Keys</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="whitelabel"
+              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400 text-zinc-400 gap-1.5 text-xs sm:text-sm"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Whitelabel</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -1024,6 +1180,9 @@ function SettingsContent() {
           </TabsContent>
           <TabsContent value="api-keys">
             <ApiKeysTab />
+          </TabsContent>
+          <TabsContent value="whitelabel">
+            <WhitelabelTab />
           </TabsContent>
         </Tabs>
     </div>

@@ -64,7 +64,7 @@ export function UserNav({ onResetOnboarding }: UserNavProps) {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
           <Avatar className="h-8 w-8">
             {user.image && <AvatarImage src={user.image} alt={user.name || "User avatar"} />}
-            <AvatarFallback className="bg-gradient-to-br from-violet-600 to-cyan-500 text-white text-xs font-medium">
+            <AvatarFallback className="bg-linear-to-br from-violet-600 to-cyan-500 text-white text-xs font-medium">
               {initials}
             </AvatarFallback>
           </Avatar>

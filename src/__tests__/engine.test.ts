@@ -39,7 +39,7 @@ describe('getCategoryForType', () => {
   })
 
   it('returns first category as fallback for unknown types', () => {
-    const result = getCategoryForType('unknown-type-xyz')
+    const result = getCategoryForType('unknown-type-xyz' as any)
     expect(result.category).toBe(NODE_CATEGORIES[0].category)
   })
 })

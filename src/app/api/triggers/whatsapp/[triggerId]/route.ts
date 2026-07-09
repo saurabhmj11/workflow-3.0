@@ -21,7 +21,7 @@ export async function GET(
     const trigger = await db.whatsAppTrigger.findUnique({
       where: { triggerId },
       include: {
-        workflow: { select: { id: true, name: true, isActive: true } },
+        workflow: { select: { id: true, name: true, isActive: true, userId: true } },
       },
     })
 

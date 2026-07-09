@@ -184,7 +184,7 @@ export class AgentOrchestrator {
       for (let round = 0; round < state.maxRounds; round++) {
         state.currentRound = round + 1
 
-        if (state.status === 'paused') {
+        if ((state.status as string) === 'paused') {
           log.info({ sessionId, round }, 'Orchestration paused')
           break
         }
@@ -219,14 +219,14 @@ export class AgentOrchestrator {
           await new Promise((resolve) => setTimeout(resolve, 200))
 
           // Check if paused
-          if (state.status === 'paused') break
+          if ((state.status as string) === 'paused') break
         }
 
-        if (state.status === 'paused') break
+        if ((state.status as string) === 'paused') break
       }
 
       // Synthesize final result based on pattern
-      if (state.status !== 'paused') {
+      if ((state.status as string) !== 'paused') {
         state.status = 'completed'
         state.currentTurn = null
 
@@ -365,13 +365,13 @@ export class AgentOrchestrator {
 
         await new Promise((resolve) => setTimeout(resolve, 200))
 
-        if (state.status === 'paused') break
+        if ((state.status as string) === 'paused') break
       }
 
-      if (state.status === 'paused') break
+      if ((state.status as string) === 'paused') break
     }
 
-    if (state.status !== 'paused') {
+    if ((state.status as string) !== 'paused') {
       state.status = 'completed'
       state.currentTurn = null
 

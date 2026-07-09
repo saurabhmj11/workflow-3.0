@@ -90,7 +90,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-4 text-center pb-2">
           {/* Logo */}
           <div className="mx-auto flex items-center justify-center">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+            <div className="h-12 w-12 rounded-xl bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
               <Headphones className="h-6 w-6 text-white" />
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function RegisterPage() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-medium shadow-lg shadow-violet-500/20"
+              className="w-full h-11 bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-medium shadow-lg shadow-violet-500/20"
               disabled={isLoading}
             >
               {isLoading ? (

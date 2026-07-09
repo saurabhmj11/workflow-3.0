@@ -20,12 +20,13 @@ export async function GET(
     const spanMap = new Map(trace.spans.map(s => [s.id, s]))
     const rootSpans = trace.spans.filter(s => !s.parentId)
 
+    type SpanType = NonNullable<typeof trace>['spans'][0]
     interface SpanNode {
-      span: typeof trace.spans[0]
+      span: SpanType
       children: SpanNode[]
     }
 
-    function buildSpanTree(span: typeof trace.spans[0]): SpanNode {
+    function buildSpanTree(span: SpanType): SpanNode {
       const children = trace!.spans.filter(s => s.parentId === span.id)
       return {
         span,

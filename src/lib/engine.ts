@@ -157,8 +157,11 @@ async function callAI(
   messages: Array<{ role: string; content: string }>,
   model?: string,
   temperature?: number,
-  maxTokens?: number
+  maxTokens?: number,
+  mockMode?: boolean
 ): Promise<{ content: string; usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null } | null> {
+  if (mockMode) return null
+
   try {
     const res = await fetch('/api/ai/completions', {
       method: 'POST',
@@ -451,7 +454,89 @@ async function runNode(
             confidence: 0.9,
           }
         }
+        if (node.type === 'parallel') {
+          // ─── Parallel Fork Node ────
+          // Fans out to multiple branches concurrently.
+          // Each outgoing edge (branch_0, branch_1, ...) gets a copy of the input.
+          // Downstream merge nodes collect and aggregate results.
+          const branchCount = (config.branchCount as number) ?? 2
+          const branchLabels = (config.branchLabels as string[]) ?? Array.from({ length: branchCount }, (_, i) => `Branch ${i + 1}`)
+          const outEdgesParallel = _graph?.outEdges?.get(node.id) ?? []
+
+          // Find branch body nodes
+          const branchTasks = outEdgesParallel
+            .filter(e => e.sourceHandle?.startsWith('branch_'))
+            .slice(0, branchCount)
+            .map(async (edge) => {
+              const branchNode = (_graph?.nodes ?? []).find(n => n.id === edge.target)
+              if (!branchNode) return { branch: edge.sourceHandle, output: null, error: 'Branch node not found' }
+              try {
+                const result = await runNode(branchNode, _context, input, _nodeOutputs, _graph)
+                return { branch: edge.sourceHandle, output: result.output, confidence: result.confidence }
+              } catch (err) {
+                return { branch: edge.sourceHandle, output: null, error: err instanceof Error ? err.message : 'Branch failed' }
+              }
+            })
+
+          // Execute all branches in parallel
+          const branchResults = branchTasks.length > 0
+            ? await Promise.all(branchTasks)
+            : branchLabels.map((label, i) => ({ branch: `branch_${i}`, output: { label, input }, confidence: 1.0 }))
+
+          return {
+            output: {
+              parallelFork: true,
+              branchCount: branchResults.length,
+              branchResults,
+              input,
+            },
+            confidence: 0.95,
+          }
+        }
+        if (node.type === 'merge') {
+          // ─── Merge Node ────
+          // Aggregates results from all incoming parallel branches.
+          // Collects outputs from all predecessor nodes connected via branch_* handles.
+          const mergeStrategy = (config.mergeStrategy as string) ?? 'array' // 'array' | 'first' | 'last' | 'object'
+          const inEdgesMerge = _graph?.edges.filter(e => e.target === node.id) ?? []
+
+          const branchOutputs = inEdgesMerge.map(edge => {
+            const sourceOutput = _nodeOutputs[edge.source]
+            return { sourceId: edge.source, handle: edge.sourceHandle ?? 'default', output: sourceOutput }
+          })
+
+          let mergedOutput: unknown
+          const outputs = branchOutputs.map(b => b.output).filter(o => o !== undefined)
+
+          switch (mergeStrategy) {
+            case 'first':
+              mergedOutput = outputs[0] ?? null
+              break
+            case 'last':
+              mergedOutput = outputs[outputs.length - 1] ?? null
+              break
+            case 'object':
+              mergedOutput = Object.fromEntries(branchOutputs.map(b => [b.handle, b.output]))
+              break
+            case 'array':
+            default:
+              mergedOutput = outputs
+          }
+
+          return {
+            output: {
+              merged: true,
+              branchCount: branchOutputs.length,
+              mergeStrategy,
+              result: mergedOutput,
+              branches: branchOutputs,
+              input,
+            },
+            confidence: 0.95,
+          }
+        }
         return { output: { logicResult: true, input }, confidence: 0.9 }
+
 
       case 'ai': {
         // ─── Memory Context Injection ───
@@ -479,7 +564,8 @@ async function runNode(
               ],
               (resolvedConfig.model as string) || 'gpt-4o',
               (resolvedConfig.temperature as number) ?? 0.7,
-              (resolvedConfig.maxTokens as number) ?? 2048
+              (resolvedConfig.maxTokens as number) ?? 2048,
+              _context.mockMode
             )
 
             if (aiResult) {
@@ -575,7 +661,8 @@ Where:
             ],
             'gpt-4o',
             0.3, // Low temperature for consistent classification
-            256
+            256,
+            _context.mockMode
           )
 
           if (aiResult) {
@@ -743,7 +830,8 @@ Where:
             ],
             (config.model as string) || 'gpt-4o',
             (config.temperature as number) ?? 0.5,
-            (config.maxTokens as number) ?? 2048
+            (config.maxTokens as number) ?? 2048,
+            _context.mockMode
           )
 
           if (aiResult) {
@@ -812,7 +900,8 @@ Where:
             ],
             (config.model as string) || 'gpt-4o',
             (config.temperature as number) ?? 0.3, // Low temperature for factual RAG
-            (config.maxTokens as number) ?? 2048
+            (config.maxTokens as number) ?? 2048,
+            _context.mockMode
           )
 
           if (aiResult) {
@@ -875,7 +964,8 @@ Where:
             ],
             (config.model as string) || 'gpt-4o',
             (config.temperature as number) ?? 0.3, // Low temperature for factual summaries
-            (config.maxTokens as number) ?? 1024
+            (config.maxTokens as number) ?? 1024,
+            _context.mockMode
           )
 
           if (aiResult) {
@@ -973,7 +1063,16 @@ Where:
               }
             }
 
-            const response = await fetch(resolvedUrl, fetchOptions)
+            let response: Response
+            if (_context.mockMode) {
+              response = new Response(JSON.stringify({ mock: true, data: "Mocked HTTP response" }), {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': 'application/json' },
+              })
+            } else {
+              response = await fetch(resolvedUrl, fetchOptions)
+            }
             clearTimeout(timeoutId)
 
             let responseBody: unknown
@@ -1115,6 +1214,15 @@ Where:
           }
 
           try {
+            if (_context.mockMode) {
+              return {
+                output: { subflowResult: { status: 'completed', steps: [] }, workflowId: targetWorkflowId, triggered: true, mock: true },
+                tokenUsage: { prompt: 0, completion: 0 },
+                costUsd: 0,
+                confidence: 1.0,
+              }
+            }
+
             // Fetch the target workflow from API
             const wfRes = await fetch(`/api/workflows/${targetWorkflowId}`)
             const wfJson = await wfRes.json()
@@ -1434,7 +1542,8 @@ export async function executeWorkflow(
   nodes: NodeDefinition[],
   edges: EdgeDefinition[],
   variables: Record<string, unknown> = {},
-  resumeFromApproval?: { approvalId: string; approved: boolean; nodeId: string; runId: string; nodeOutputs: NodeOutputStore }
+  resumeFromApproval?: { approvalId: string; approved: boolean; nodeId: string; runId: string; nodeOutputs: NodeOutputStore },
+  options?: { mockMode?: boolean }
 ): Promise<void> {
   // Access stores — use .getState() for latest state each time to avoid stale closures
   let runId: string
@@ -1473,6 +1582,7 @@ export async function executeWorkflow(
     maxDepth: 10,
     triggeredBy: 'api',
     nodeOutputs,
+    mockMode: options?.mockMode,
   }
 
   // Find trigger nodes (entry points)

@@ -67,7 +67,7 @@ function MetricCard({ metric, trend }: { metric: DemoMetric; trend: 'up' | 'down
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2">
       <div className="flex items-center justify-between">
         <Icon className="h-3.5 w-3.5 text-zinc-500" />
-        <ChangeIndicator change={metric.change} changeType={metric.changeType} />
+        <ChangeIndicator change={metric.change} type={metric.changeType} />
       </div>
       <div>
         <p className="text-lg font-bold text-zinc-100 leading-none">{metric.value}</p>

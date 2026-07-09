@@ -65,7 +65,7 @@ export default function DemoPage() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('openworkflow-load-template', 'ai-support-employee')
     }
-    router.push('/builder')
+    router.push('/build')
   }, [router])
 
   const handleShare = useCallback(() => {
@@ -92,7 +92,7 @@ export default function DemoPage() {
           </button>
           <div className="w-px h-5 bg-zinc-700" />
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
               <Headphones className="h-4 w-4 text-white" />
             </div>
             <div>
@@ -129,7 +129,7 @@ export default function DemoPage() {
           </Button>
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-xs"
+            className="h-8 gap-1.5 bg-linear-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-xs"
             onClick={handleLoadToCanvas}
           >
             <Workflow className="h-3.5 w-3.5" />
@@ -157,7 +157,7 @@ export default function DemoPage() {
               /* ─── Welcome / Hero State ─── */
               <div className="flex items-center justify-center h-full">
                 <div className="max-w-lg text-center space-y-6">
-                  <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-violet-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-cyan-500/10">
+                  <div className="h-20 w-20 rounded-lg bg-linear-to-br from-cyan-500/10 to-violet-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto shadow-2xl shadow-cyan-500/10">
                     <Headphones className="h-10 w-10 text-cyan-400" />
                   </div>
                   <div>
@@ -194,7 +194,7 @@ export default function DemoPage() {
                   <div className="pt-2">
                     <Button
                       size="sm"
-                      className="h-10 gap-2 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white shadow-lg shadow-cyan-500/20"
+                      className="h-10 gap-2 bg-linear-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white shadow-lg shadow-cyan-500/20"
                       onClick={() => handleEmailSelect(DEMO_EMAILS[0])}
                     >
                       <Sparkles className="h-4 w-4" />

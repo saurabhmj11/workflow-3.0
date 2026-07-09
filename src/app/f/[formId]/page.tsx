@@ -136,7 +136,7 @@ export default function PublicFormPage() {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <div className="h-16 w-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="h-16 w-16 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="h-8 w-8 text-red-400" />
           </div>
           <h1 className="text-xl font-semibold text-zinc-100 mb-2">Form Not Available</h1>
@@ -158,7 +158,7 @@ export default function PublicFormPage() {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="h-16 w-16 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="h-8 w-8 text-emerald-400" />
           </div>
           <h1 className="text-xl font-semibold text-zinc-100 mb-2">Thank You!</h1>
@@ -194,7 +194,7 @@ export default function PublicFormPage() {
           {/* Header */}
           <div className="px-6 pt-6 pb-4 border-b border-zinc-800">
             <div className="flex items-center gap-3 mb-1">
-              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-lg bg-linear-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
                 <FileText className="h-4.5 w-4.5 text-white" />
               </div>
               <div>
@@ -302,7 +302,7 @@ export default function PublicFormPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-semibold text-sm transition-all shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-lg bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-semibold text-sm transition-all shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
@@ -318,7 +318,7 @@ export default function PublicFormPage() {
 
         {/* Branding */}
         <p className="text-center text-[11px] text-zinc-600 mt-4">
-          Powered by <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent font-medium">OpenWorkflow</span>
+          Powered by <span className="bg-linear-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent font-medium">OpenWorkflow</span>
         </p>
       </div>
     </div>

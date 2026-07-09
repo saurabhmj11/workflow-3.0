@@ -35,6 +35,20 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
+import { motion } from 'framer-motion'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+}
 
 // ─── Colors ──────────────────────────────────────
 const COLORS = {
@@ -135,36 +149,38 @@ function MetricCard({
   color?: string
 }) {
   const colorMap: Record<string, string> = {
-    cyan: 'from-cyan-500/10 border-cyan-500/20 text-cyan-400',
-    emerald: 'from-emerald-500/10 border-emerald-500/20 text-emerald-400',
-    amber: 'from-amber-500/10 border-amber-500/20 text-amber-400',
-    violet: 'from-violet-500/10 border-violet-500/20 text-violet-400',
-    red: 'from-red-500/10 border-red-500/20 text-red-400',
-    blue: 'from-blue-500/10 border-blue-500/20 text-blue-400',
+    cyan: 'from-cyan-500/5 border-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.05)]',
+    emerald: 'from-emerald-500/5 border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]',
+    amber: 'from-amber-500/5 border-amber-500/20 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.05)]',
+    violet: 'from-violet-500/5 border-violet-500/20 text-violet-400 shadow-[0_0_15px_rgba(139,92,246,0.05)]',
+    red: 'from-red-500/5 border-red-500/20 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.05)]',
+    blue: 'from-blue-500/5 border-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.05)]',
   }
   const colorClass = colorMap[color] ?? colorMap.cyan
 
   return (
-    <Card className={`bg-gradient-to-br ${colorClass.split(' ')[0]} to-transparent border ${colorClass.split(' ')[1]}`}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <CardTitle className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${colorClass.split(' ')[2]}`} />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-zinc-100">{value}</div>
-        {(subtitle || trendLabel) && (
-          <div className="flex items-center gap-1 mt-1">
-            {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-400" />}
-            {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-400" />}
-            <span className={`text-xs ${
-              trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-500'
-            }`}>
-              {trendLabel || subtitle}
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <motion.div variants={itemVariants} className="h-full">
+      <Card className={`h-full bg-zinc-900/40 backdrop-blur-md bg-linear-to-br ${colorClass.split(' ')[0]} to-transparent border ${colorClass.split(' ')[1]} ${colorClass.split(' ')[3]} hover:bg-zinc-900/60 transition-all duration-300`}>
+        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+          <CardTitle className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{title}</CardTitle>
+          <Icon className={`h-4 w-4 ${colorClass.split(' ')[2]}`} />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-zinc-100">{value}</div>
+          {(subtitle || trendLabel) && (
+            <div className="flex items-center gap-1 mt-1">
+              {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-400" />}
+              {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-400" />}
+              <span className={`text-xs ${
+                trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-500'
+              }`}>
+                {trendLabel || subtitle}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
 
@@ -511,9 +527,14 @@ export default function AIEmployeeDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <motion.div 
+      className="max-w-7xl mx-auto px-6 py-6 space-y-6"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
         {/* Header with live status & refresh */}
-        <div className="flex items-center justify-between">
+        <motion.div variants={itemVariants} className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-zinc-100">AI Employee Dashboard</h1>
             <p className="text-xs text-zinc-500">
@@ -535,13 +556,13 @@ export default function AIEmployeeDashboard() {
               size="sm"
               onClick={() => fetchAllData(true)}
               disabled={isRefreshing}
-              className="h-8 text-xs border-zinc-800 hover:bg-zinc-800"
+              className="h-8 text-xs border-zinc-800 hover:bg-zinc-800 shadow-[0_0_10px_rgba(255,255,255,0.05)] transition-all hover:scale-105 active:scale-95"
             >
               <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Error Banner */}
         {fetchError && (
@@ -558,36 +579,36 @@ export default function AIEmployeeDashboard() {
 
         {/* Real-time Metrics Row */}
         {realtimeMetrics && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
               <div className={`h-2 w-2 rounded-full ${realtimeMetrics.activeExecutions > 0 ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`} />
               <div>
                 <p className="text-xs text-zinc-500">Active Now</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.activeExecutions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
               <div>
                 <p className="text-xs text-zinc-500">Completed (1h)</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentCompletions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
               <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
               <div>
                 <p className="text-xs text-zinc-500">Errors (5m)</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentErrors}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
               <Clock className="h-3.5 w-3.5 text-cyan-500" />
               <div>
                 <p className="text-xs text-zinc-500">Avg Response</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.avgResponseTime > 0 ? `${(realtimeMetrics.avgResponseTime / 1000).toFixed(1)}s` : '—'}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Top Metric Cards */}
@@ -820,7 +841,7 @@ export default function AIEmployeeDashboard() {
                 <CardContent>
                   <div className="space-y-2">
                     {metrics.topWorkflows.slice(0, 5).map((wf, i) => (
-                      <Link key={wf.workflowId} href={`/builder?workflowId=${wf.workflowId}`} className="block">
+                      <Link key={wf.workflowId} href={`/build?workflowId=${wf.workflowId}`} className="block">
                         <div className="flex items-center justify-between p-2 rounded-lg border border-zinc-800 bg-zinc-950/30 hover:border-cyan-500/20 transition-colors">
                           <div className="flex items-center gap-3">
                             <span className="text-xs text-zinc-600 w-4">#{i + 1}</span>
@@ -1139,7 +1160,7 @@ export default function AIEmployeeDashboard() {
 
         {/* Bottom Section: Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Link href="/builder">
+          <Link href="/build">
             <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
@@ -1152,7 +1173,7 @@ export default function AIEmployeeDashboard() {
               </CardContent>
             </Card>
           </Link>
-          <Link href="/builder?ai=true">
+          <Link href="/build?ai=true">
             <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -1192,6 +1213,6 @@ export default function AIEmployeeDashboard() {
             </Card>
           </Link>
         </div>
-    </div>
+    </motion.div>
   )
 }

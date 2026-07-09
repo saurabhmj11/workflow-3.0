@@ -171,7 +171,7 @@ export function PipelineVisualizer({ email, onComplete, onCancel }: PipelineVisu
       <div className="flex items-center gap-3">
         <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all duration-700 ease-out"
+            className="h-full bg-linear-to-r from-cyan-500 to-violet-500 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
           />
         </div>
@@ -330,7 +330,7 @@ export function PipelineVisualizer({ email, onComplete, onCancel }: PipelineVisu
       {steps.every((s) => s.status === 'pending') && (
         <button
           onClick={handleStart}
-          className="w-full h-10 rounded-lg bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-sm font-medium flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
+          className="w-full h-10 rounded-lg bg-linear-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-sm font-medium flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
         >
           <Zap className="h-4 w-4" />
           Run AI Support Employee

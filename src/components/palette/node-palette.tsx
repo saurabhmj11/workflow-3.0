@@ -27,11 +27,11 @@ function getNodeIcon(type: string, category: NodeCategory): typeof Zap {
 }
 
 const HOVER_BG: Record<string, string> = {
-  trigger: 'hover:bg-blue-500/10',
-  logic: 'hover:bg-emerald-500/10',
-  ai: 'hover:bg-violet-500/10',
-  human: 'hover:bg-amber-500/10',
-  action: 'hover:bg-cyan-500/10',
+  trigger: 'hover:bg-blue-100 hover:border-blue-300',
+  logic: 'hover:bg-green-100 hover:border-green-300',
+  ai: 'hover:bg-purple-100 hover:border-purple-300',
+  human: 'hover:bg-yellow-100 hover:border-yellow-300',
+  action: 'hover:bg-pink-100 hover:border-pink-300',
 }
 
 let nodeCounter = 0
@@ -71,48 +71,48 @@ export function NodePalette() {
   }
 
   return (
-    <div className="w-56 border-r border-zinc-800 bg-zinc-900/80 overflow-y-auto flex flex-col">
-      <div className="p-3 border-b border-zinc-800">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Node Palette</h3>
-        <p className="text-[10px] text-zinc-600 mt-0.5">Click or drag to add</p>
+    <div className="w-72 border-r border-slate-200 bg-white overflow-y-auto flex flex-col shadow-sm z-10">
+      <div className="p-4 border-b border-border text-center">
+        <h3 className="text-xl font-semibold text-foreground">Node Palette</h3>
+        <p className="text-sm font-medium text-muted-foreground mt-1">Drag nodes to canvas</p>
       </div>
       {/* Search input */}
-      <div className="p-2 border-b border-zinc-800">
+      <div className="p-4 border-b border-slate-100">
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
           <Input
             type="text"
-            placeholder="Search nodes..."
+            placeholder="Find a block..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-7 pl-7 pr-7 text-xs bg-zinc-800 border-zinc-700 text-zinc-300 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
+            className="h-10 pl-10 pr-10 text-sm bg-background border border-input rounded-md text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
       </div>
-      <div className="p-2 space-y-3 flex-1 overflow-y-auto">
+      <div className="p-4 space-y-6 flex-1 overflow-y-auto">
         {filteredCategories.length === 0 && (
-          <div className="py-6 text-center">
-            <p className="text-xs text-zinc-500">No results</p>
-            <p className="text-[10px] text-zinc-600 mt-1">Try a different search term</p>
+          <div className="py-10 text-center bg-slate-50 rounded-xl border border-slate-100 border-dashed">
+            <p className="text-xl font-medium text-muted-foreground">No results found</p>
+            <p className="text-sm text-muted-foreground mt-2">Try a different search term.</p>
           </div>
         )}
         {filteredCategories.map((cat) => (
           <div key={cat.category}>
-            <div className="flex items-center gap-1.5 px-1 py-1">
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${cat.color}`}>
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-t-md border-b border-border">
+              <span className={`text-xs font-semibold uppercase tracking-wider ${cat.color.replace('400', '600')}`}>
                 {cat.label}
               </span>
-              <span className="text-[10px] text-zinc-600">({cat.types.length})</span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">{cat.types.length}</span>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-2 pt-3 pb-1">
               {cat.types.map((type) => {
                 const Icon = getNodeIcon(type, cat.category)
                 return (
@@ -121,11 +121,13 @@ export function NodePalette() {
                     draggable
                     onDragStart={(e) => handleDragStart(e, type as NodeType, cat)}
                     onClick={() => handleClick(type as NodeType, cat)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left ${HOVER_BG[cat.category]} transition-colors group`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left border border-transparent hover:bg-muted bg-background hover:border-border transition-colors group`}
                   >
-                    <Icon className={`h-3 w-3 ${cat.color} shrink-0`} />
-                    <span className="text-xs text-zinc-400 group-hover:text-zinc-200 transition-colors">
-                      {type}
+                    <div className={`p-1.5 rounded-md ${cat.color.replace('text-', 'bg-').replace('400', '100')}`}>
+                      <Icon className={`h-5 w-5 ${cat.color.replace('400', '600')} shrink-0`} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground group-hover:text-foreground capitalize">
+                      {type.replace('-', ' ')}
                     </span>
                   </button>
                 )

@@ -241,6 +241,7 @@ export function IntegrationPanel() {
       // Use stored credentials if available
       const cred = storedCredentials[integrationId]
       const credentials = cred ? {
+        integrationId: integrationId,
         accessToken: cred.accessToken,
         apiKey: cred.apiKey,
       } : undefined

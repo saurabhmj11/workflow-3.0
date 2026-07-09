@@ -89,20 +89,20 @@ export function DeploymentPanel() {
   // ─── Fetch Data ────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
-      const envRes = await fetch('/api/deployments/environments')
+      const envRes = await fetch('/api/deploy/environments')
       const envJson = await envRes.json()
       if (envJson.ok) {
         setEnvironments(envJson.data)
       }
 
       if (workflowId) {
-        const activeRes = await fetch(`/api/deployments?workflowId=${workflowId}&active=true`)
+        const activeRes = await fetch(`/api/deploy?workflowId=${workflowId}&active=true`)
         const activeJson = await activeRes.json()
         if (activeJson.ok) {
           setActiveDeployments(activeJson.data)
         }
 
-        const histRes = await fetch(`/api/deployments?workflowId=${workflowId}`)
+        const histRes = await fetch(`/api/deploy?workflowId=${workflowId}`)
         const histJson = await histRes.json()
         if (histJson.ok) {
           setHistory(histJson.data.slice(0, 20))
@@ -128,7 +128,7 @@ export function DeploymentPanel() {
 
     setDeploying(envSlug)
     try {
-      const res = await fetch('/api/deployments', {
+      const res = await fetch('/api/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflowId, environment: envSlug }),
@@ -153,7 +153,7 @@ export function DeploymentPanel() {
 
     setPromoting(toEnv)
     try {
-      const res = await fetch('/api/deployments/promote', {
+      const res = await fetch('/api/deploy/promote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflowId, fromEnv, toEnv }),
@@ -177,7 +177,7 @@ export function DeploymentPanel() {
   const handleRollback = useCallback(async (deploymentId: string) => {
     setRollingBack(deploymentId)
     try {
-      const res = await fetch(`/api/deployments/${deploymentId}`, {
+      const res = await fetch(`/api/deploy/${deploymentId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'rollback' }),

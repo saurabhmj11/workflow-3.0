@@ -99,7 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       // Initial sign in — add user info to token
-      if (user) {
+      if (user && user.id) {
         token.userId = user.id
         token.role = (user as { role?: string }).role ?? "USER"
       }
@@ -134,6 +134,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
       return true
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) {
+        if (url === '/') return `${baseUrl}/dashboard`
+        return `${baseUrl}${url}`
+      }
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) {
+        if (url === baseUrl || url === `${baseUrl}/`) return `${baseUrl}/dashboard`
+        return url
+      }
+      // Fallback
+      return `${baseUrl}/dashboard`
     },
   },
   trustHost: true,

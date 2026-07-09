@@ -130,16 +130,16 @@ function AgentNode({ data, selected, id }: NodeProps) {
 
   return (
     <div
-      className={`relative rounded-lg border-2 bg-zinc-900 shadow-lg min-w-[160px] transition-all duration-200 ${
+      className={`relative rounded-lg border bg-background shadow-lg min-w-[180px] transition-all duration-200 ${
         selected
-          ? `${cat.borderColor} shadow-2xl ring-2 ring-white/20`
+          ? `${cat.borderColor} shadow-md ring-1 ring-ring`
           : `${cat.borderColor}`
       } ${executionClasses}`}
-      style={selected ? { boxShadow: `0 0 20px ${glowColor}, 0 0 40px ${glowColor}` } : executionStyle}
+      style={selected ? { boxShadow: `0 10px 25px ${glowColor}` } : executionStyle}
     >
       {/* Execution status badge */}
       {statusBadge && (
-        <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 border border-zinc-600 shadow-sm">
+        <div className="absolute -top-3 -right-3 z-10 flex h-8 w-8 items-center justify-center rounded-md bg-background border border-border shadow-sm">
           {statusBadge}
         </div>
       )}
@@ -152,16 +152,16 @@ function AgentNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Header */}
-      <div className={`flex items-center gap-2 px-3 py-2 rounded-t-md ${cat.bgColor} border-b ${cat.borderColor}`}>
-        <Icon className={`h-3.5 w-3.5 ${cat.color}`} />
-        <span className={`text-xs font-semibold ${cat.color} uppercase tracking-wider`}>{cat.label}</span>
+      <div className={`flex items-center gap-2 px-4 py-3 rounded-t-md ${cat.bgColor} border-b ${cat.borderColor}`}>
+        <Icon className={`h-5 w-5 ${cat.color}`} />
+        <span className={`text-sm font-semibold ${cat.color} uppercase tracking-wider`}>{cat.label}</span>
       </div>
 
       {/* Body */}
-      <div className="px-3 py-2.5">
-        <p className="text-sm font-medium text-white leading-tight">{label}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-xs text-zinc-500 font-mono">{nodeType}</p>
+      <div className="px-4 py-4">
+        <p className="text-base font-semibold text-slate-800 leading-tight">{label}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-muted-foreground font-medium uppercase">{nodeType}</p>
           {/* Confidence badge */}
           {hasConfidence && confidenceValue !== null && (
             <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded ${
@@ -187,7 +187,7 @@ function AgentNode({ data, selected, id }: NodeProps) {
         type="target"
         position={Position.Top}
         id="input"
-        className="!w-2.5 !h-2.5 !bg-zinc-600 !border-2 !border-zinc-400"
+        className="!w-4 !h-4 !bg-background !border !border-slate-300"
       />
 
       {/* Source handles (bottom) */}
@@ -200,30 +200,30 @@ function AgentNode({ data, selected, id }: NodeProps) {
           style={{
             left: `${(i + 1) / (handles.length + 1) * 100}%`,
           }}
-          className={`!w-2.5 !h-2.5 !border-2 ${
+          className={`!w-4 !h-4 !border ${
             handle === 'true' || handle === 'approved' || handle === 'high_confidence'
-              ? '!bg-emerald-500 !border-emerald-300'
+              ? '!bg-green-100 !border-green-400'
               : handle === 'false' || handle === 'rejected' || handle === 'low_confidence'
-              ? '!bg-red-500 !border-red-300'
+              ? '!bg-red-100 !border-red-400'
               : handle === 'error'
-              ? '!bg-amber-500 !border-amber-300'
-              : '!bg-zinc-600 !border-zinc-400'
+              ? '!bg-amber-100 !border-amber-400'
+              : '!bg-muted !border-slate-300'
           }`}
         />
       ))}
 
       {/* Handle labels */}
       {handles.length > 1 && (
-        <div className="flex justify-around px-3 pb-2">
+        <div className="flex justify-around px-4 pb-3">
           {handles.map((handle) => (
             <span
               key={handle}
-              className={`text-[9px] font-mono ${
+              className={`text-[10px] font-semibold uppercase ${
                 handle === 'true' || handle === 'approved' || handle === 'high_confidence'
-                  ? 'text-emerald-400'
+                  ? 'text-green-500'
                   : handle === 'false' || handle === 'rejected' || handle === 'low_confidence'
-                  ? 'text-red-400'
-                  : 'text-zinc-500'
+                  ? 'text-red-500'
+                  : 'text-muted-foreground'
               }`}
             >
               {handle}

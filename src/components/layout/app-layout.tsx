@@ -3,10 +3,11 @@
 import { useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Menu, Workflow } from 'lucide-react'
+import { Zap, Menu, Workflow, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AppSidebar, PAGE_META, EXCLUDED_ROUTES } from './app-sidebar'
+import { CommandPalette, useCommandPalette } from '@/components/palette/command-palette'
 
 // ─── AppLayout Component ────────────────────────────
 
@@ -14,13 +15,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette()
 
   // Check if this route should be excluded from the layout
   const isExcluded = EXCLUDED_ROUTES.some(route => {
-    if (route === '/builder') return pathname === '/builder' || pathname.startsWith('/builder/')
+    if (route === '/build') return pathname === '/build' || pathname.startsWith('/build/')
     if (route === '/demo') return pathname === '/demo' || pathname.startsWith('/demo/')
     if (route === '/login') return pathname === '/login' || pathname.startsWith('/login/')
     if (route === '/register') return pathname === '/register' || pathname.startsWith('/register/')
+    if (route === '/chat') return pathname === '/chat' || pathname.startsWith('/chat/')
     return pathname === route
   })
 
@@ -55,6 +58,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
         onMobileClose={closeMobile}
+        onOpenCommandPalette={() => setCmdOpen(true)}
       />
 
       {/* Main Content */}
@@ -75,12 +79,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Command Palette button in header */}
+            <button
+              onClick={() => setCmdOpen(true)}
+              className="hidden md:flex items-center gap-2 h-8 px-3 rounded-lg text-xs text-zinc-400 bg-zinc-800/60 border border-zinc-700/50 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search...</span>
+              <kbd className="text-[9px] bg-zinc-700 border border-zinc-600 rounded px-1 py-0.5 ml-1">⌘K</kbd>
+            </button>
             <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-400">
               <Zap className="h-2.5 w-2.5 mr-1" />
               v3.0
             </Badge>
-            <Link href="/builder">
-              <Button size="sm" className="h-8 text-xs bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white">
+            <Link href="/build">
+              <Button size="sm" className="h-8 text-xs bg-linear-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white">
                 <Workflow className="h-3.5 w-3.5 mr-1.5" />
                 New Workflow
               </Button>
@@ -93,6 +106,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      {/* Global Command Palette */}
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
   )
 }

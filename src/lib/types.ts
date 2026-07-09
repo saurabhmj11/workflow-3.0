@@ -4,7 +4,7 @@
 
 // ─── Node Categories ─────────────────────────────
 export const TRIGGER_TYPES = ['api', 'webhook', 'schedule', 'email', 'form', 'voice-call', 'whatsapp', 'subflow'] as const
-export const LOGIC_TYPES = ['condition', 'switch', 'loop', 'retry', 'delay'] as const
+export const LOGIC_TYPES = ['condition', 'switch', 'loop', 'retry', 'delay', 'parallel', 'merge'] as const
 export const AI_TYPES = ['llm', 'agent', 'rag', 'classifier', 'summarizer'] as const
 export const HUMAN_TYPES = ['approval', 'review', 'escalation'] as const
 export const ACTION_TYPES = ['crm', 'email', 'slack', 'whatsapp', 'database', 'trigger-workflow', 'http-request', 'code'] as const
@@ -29,11 +29,11 @@ export interface NodeCategoryDef {
 }
 
 export const NODE_CATEGORIES: NodeCategoryDef[] = [
-  { category: 'trigger', label: 'Trigger', color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', icon: 'Zap', types: TRIGGER_TYPES },
-  { category: 'logic', label: 'Logic', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/30', icon: 'GitBranch', types: LOGIC_TYPES },
-  { category: 'ai', label: 'AI', color: 'text-violet-400', bgColor: 'bg-violet-500/10', borderColor: 'border-violet-500/30', icon: 'Brain', types: AI_TYPES },
-  { category: 'human', label: 'Human', color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', icon: 'UserCheck', types: HUMAN_TYPES },
-  { category: 'action', label: 'Action', color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/30', icon: 'Plug', types: ACTION_TYPES },
+  { category: 'trigger', label: 'Trigger', color: 'text-blue-500', bgColor: 'bg-blue-100', borderColor: 'border-blue-400', icon: 'Zap', types: TRIGGER_TYPES },
+  { category: 'logic', label: 'Logic', color: 'text-green-500', bgColor: 'bg-green-100', borderColor: 'border-green-400', icon: 'GitBranch', types: LOGIC_TYPES },
+  { category: 'ai', label: 'AI', color: 'text-purple-500', bgColor: 'bg-purple-100', borderColor: 'border-purple-400', icon: 'Brain', types: AI_TYPES },
+  { category: 'human', label: 'Human', color: 'text-orange-500', bgColor: 'bg-orange-100', borderColor: 'border-orange-400', icon: 'UserCheck', types: HUMAN_TYPES },
+  { category: 'action', label: 'Action', color: 'text-pink-500', bgColor: 'bg-pink-100', borderColor: 'border-pink-400', icon: 'Plug', types: ACTION_TYPES },
 ]
 
 export function getCategoryForType(type: NodeType): NodeCategoryDef {
@@ -51,7 +51,7 @@ export interface NodeDefinition {
 }
 
 // ─── Edge Definition ─────────────────────────────
-export type SourceHandle = 'default' | 'true' | 'false' | 'error' | 'approved' | 'rejected' | 'high_confidence' | 'low_confidence'
+export type SourceHandle = 'default' | 'true' | 'false' | 'error' | 'approved' | 'rejected' | 'high_confidence' | 'low_confidence' | 'branch_0' | 'branch_1' | 'branch_2' | 'branch_3'
 export type TargetHandle = 'default' | 'input'
 
 export interface EdgeDefinition {
@@ -85,6 +85,8 @@ export interface ExecutionContext {
   triggeredBy?: TriggeredBy
   /** Outputs from previously executed nodes, keyed by nodeId. Available for debugging. */
   nodeOutputs?: Record<string, unknown>
+  /** If true, skip real external calls and return mock responses (for testing and assertions). */
+  mockMode?: boolean
 }
 
 export type NodeExecutionStatus = 'success' | 'error' | 'skipped' | 'pending' | 'running'
@@ -161,6 +163,10 @@ export function getSourceHandles(type: NodeType): SourceHandle[] {
   if (type === 'escalation') return ['default', 'error']
   // AI nodes with confidence routing
   if (type === 'llm' || type === 'classifier' || type === 'agent') return ['high_confidence', 'low_confidence']
+  // Parallel fork node — outputs to multiple branches
+  if (type === 'parallel') return ['branch_0', 'branch_1', 'branch_2', 'branch_3']
+  // Merge node — single output
+  if (type === 'merge') return ['default']
   // Trigger-workflow has success + error outputs
   if (type === 'trigger-workflow') return ['default', 'error']
   // Code and HTTP Request nodes have default + error outputs

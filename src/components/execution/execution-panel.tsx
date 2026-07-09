@@ -149,7 +149,7 @@ function StepCard({ step, index, cat }: { step: ReturnType<typeof useExecutionSt
               {step.costUsd && <span className="text-[10px] text-muted-foreground">Cost: ${step.costUsd}</span>}
             </div>
           )}
-          {step.output && (
+          {!!step.output && (
             <div>
               <p className="text-[10px] text-muted-foreground mb-1">Output:</p>
               <pre className="text-[10px] font-mono text-emerald-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32">

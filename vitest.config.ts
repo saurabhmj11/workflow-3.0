@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/__tests__/**/*.test.{ts,tsx}'],
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       include: ['src/lib/**/*.ts', 'src/stores/**/*.ts'],

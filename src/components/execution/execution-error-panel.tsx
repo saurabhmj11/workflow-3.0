@@ -41,10 +41,10 @@ function classifyError(error: string): ErrorCategory {
 }
 
 const ERROR_CATEGORY_META: Record<ErrorCategory, { label: string; color: string; bgColor: string; borderColor: string }> = {
-  timeout: { label: 'Timeout', color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30' },
-  api_error: { label: 'API Error', color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30' },
-  validation_error: { label: 'Validation', color: 'text-orange-400', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30' },
-  unknown: { label: 'Unknown', color: 'text-zinc-400', bgColor: 'bg-zinc-500/10', borderColor: 'border-zinc-500/30' },
+  timeout: { label: 'Too Slow!', color: 'text-orange-600', bgColor: 'bg-orange-100', borderColor: 'border-orange-200' },
+  api_error: { label: 'Connection Lost', color: 'text-red-600', bgColor: 'bg-red-100', borderColor: 'border-red-200' },
+  validation_error: { label: 'Oopsie!', color: 'text-pink-600', bgColor: 'bg-pink-100', borderColor: 'border-pink-200' },
+  unknown: { label: 'Unknown Error', color: 'text-slate-500', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },
 }
 
 // ─── Execution Error Panel Props ──────────────────
@@ -108,18 +108,20 @@ export function ExecutionErrorPanel({
   return (
     <div className="space-y-3">
       {/* Error header with red border */}
-      <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3">
-        <div className="flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+      <div className="rounded-lg border border-red-100 bg-red-50 p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="bg-red-200 p-1.5 rounded-full mt-0.5">
+            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-medium text-red-300">Error</span>
-              <Badge className={`text-[9px] gap-1 ${categoryMeta.bgColor} ${categoryMeta.color} ${categoryMeta.borderColor} border hover:${categoryMeta.bgColor}`}>
+              <span className="text-sm font-bold text-red-500 uppercase tracking-wider">Error</span>
+              <Badge className={`text-[10px] font-bold uppercase gap-1 ${categoryMeta.bgColor} ${categoryMeta.color} ${categoryMeta.borderColor} border-2 hover:${categoryMeta.bgColor} rounded-xl px-2 py-0.5`}>
                 {categoryMeta.label}
               </Badge>
-              <span className={`text-[9px] ${cat.color} font-mono`}>{step.nodeType}</span>
+              <span className={`text-[10px] font-bold bg-white px-2 py-0.5 rounded-lg border-2 border-slate-100 text-slate-500`}>{step.nodeType}</span>
             </div>
-            <p className="text-[11px] text-red-400 mt-1 font-mono break-words">
+            <p className="text-xs font-bold text-red-600 mt-2 font-mono wrap-break-word bg-white p-2 rounded-xl border-2 border-red-100 leading-relaxed">
               {errorMessage}
             </p>
           </div>
@@ -128,16 +130,16 @@ export function ExecutionErrorPanel({
 
       {/* Stack trace (if available) */}
       {stackTrace && (
-        <div>
+        <div className="bg-white rounded-xl border-2 border-slate-100 p-2">
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors w-full px-2 py-1"
           >
-            {showDetails ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            Stack Trace
+            {showDetails ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            Nerd Details
           </button>
           {showDetails && (
-            <pre className="mt-1 text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+            <pre className="mt-2 text-[10px] font-mono font-medium text-slate-600 bg-slate-50 rounded-xl p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
               {stackTrace}
             </pre>
           )}
@@ -145,36 +147,34 @@ export function ExecutionErrorPanel({
       )}
 
       {/* Node type and config */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-          <Cpu className="h-3 w-3" />
-          <span>Node: <span className="text-zinc-300">{step.label}</span></span>
-          <span className="text-zinc-700">·</span>
-          <span className={cat.color}>{step.nodeType}</span>
-          <span className="text-zinc-700">·</span>
-          <span className="text-zinc-300 font-mono">{step.nodeId}</span>
+      <div className="space-y-3 bg-white rounded-lg border border-slate-100 p-4">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
+          <Cpu className="h-4 w-4 text-slate-300" />
+          <span>Block: <span className="text-slate-600 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100">{step.label}</span></span>
+          <span className="text-slate-300">·</span>
+          <span className="bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border-2 border-slate-100">{step.nodeType}</span>
         </div>
 
         {/* Duration */}
         {step.startedAt && step.finishedAt && (
-          <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-            <Clock className="h-3 w-3" />
-            <span>Failed after {new Date(step.finishedAt).getTime() - new Date(step.startedAt).getTime()}ms</span>
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+            <Clock className="h-4 w-4 text-slate-300" />
+            <span>Stopped after <span className="text-slate-600">{new Date(step.finishedAt).getTime() - new Date(step.startedAt).getTime()}ms</span></span>
           </div>
         )}
 
         {/* Config that caused the error */}
         {nodeConfig && Object.keys(nodeConfig).length > 0 && (
-          <div>
+          <div className="bg-slate-50 rounded-xl border-2 border-slate-100 p-2">
             <button
               onClick={() => setShowConfig(!showConfig)}
-              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors w-full px-2 py-1"
             >
-              {showConfig ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              Node Config
+              {showConfig ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              Block Settings
             </button>
             {showConfig && (
-              <pre className="mt-1 text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+              <pre className="mt-2 text-[10px] font-mono font-medium text-slate-600 bg-white rounded-lg p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
                 {JSON.stringify(nodeConfig, null, 2)}
               </pre>
             )}
@@ -183,16 +183,16 @@ export function ExecutionErrorPanel({
 
         {/* Input that was passed to the node */}
         {step.input !== undefined && step.input !== null && (
-          <div>
+          <div className="bg-slate-50 rounded-xl border-2 border-slate-100 p-2">
             <button
               onClick={() => setShowInput(!showInput)}
-              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors w-full px-2 py-1"
             >
-              {showInput ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              Input Data
+              {showInput ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              What went in
             </button>
             {showInput && (
-              <pre className="mt-1 text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+              <pre className="mt-2 text-[10px] font-mono font-medium text-slate-600 bg-white rounded-lg p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
                 {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
               </pre>
             )}
@@ -201,31 +201,30 @@ export function ExecutionErrorPanel({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-2">
         {onRetryFromStep && (
           <Button
             size="sm"
-            variant="outline"
-            className="h-7 gap-1.5 text-[11px] border-amber-500/30 text-amber-400 hover:text-amber-200 hover:bg-amber-500/10 hover:border-amber-500/50"
+            className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-b border-orange-300 bg-orange-400 text-white hover:bg-orange-300 hover:border-orange-200 active:border-b-0 active:scale-[0.98] transition-all"
             onClick={handleRetryFromStep}
             disabled={isRetrying}
           >
             {isRetrying ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <RefreshCw className="h-3 w-3" />
+              <RefreshCw className="h-4 w-4" />
             )}
-            Retry from this step
+            Retry from here
           </Button>
         )}
         <Button
           size="sm"
           variant="outline"
-          className="h-7 gap-1.5 text-[11px] border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+          className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-2 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all"
           onClick={handleCopyError}
         >
-          <Copy className="h-3 w-3" />
-          Copy Error Details
+          <Copy className="h-4 w-4" />
+          Copy Details
         </Button>
       </div>
     </div>
@@ -279,39 +278,40 @@ export function ErrorDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-lg">
+      <DialogContent className="bg-white border border-slate-100 text-slate-700 max-w-lg rounded-[2rem] p-6 shadow-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-400">
-            <AlertTriangle className="h-4 w-4" />
-            Error Details
+          <DialogTitle className="flex items-center gap-2 text-red-500 text-xl font-extrabold">
+            <div className="bg-red-100 p-2 rounded-lg">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            Uh Oh! Let's Fix This!
           </DialogTitle>
-          <DialogDescription className="text-zinc-500 text-xs">
-            Full error information for failed node &quot;{step.label}&quot;
+          <DialogDescription className="text-slate-500 text-sm font-medium mt-2">
+            Something went wrong with the "{step.label}" block. Don't worry, we can figure it out!
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {/* Error summary */}
-          <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge className={`text-[9px] gap-1 ${categoryMeta.bgColor} ${categoryMeta.color} ${categoryMeta.borderColor} border hover:${categoryMeta.bgColor}`}>
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className={`text-[10px] font-bold uppercase gap-1 ${categoryMeta.bgColor} ${categoryMeta.color} ${categoryMeta.borderColor} border-2 hover:${categoryMeta.bgColor} rounded-xl px-2 py-0.5`}>
                 {categoryMeta.label}
               </Badge>
-              <span className={`text-[9px] ${cat.color} font-mono`}>{step.nodeType}</span>
-              <span className="text-[9px] text-zinc-600 font-mono">{step.nodeId}</span>
+              <span className={`text-[10px] font-bold bg-white px-2 py-0.5 rounded-lg border-2 border-slate-100 text-slate-500`}>{step.nodeType}</span>
             </div>
-            <p className="text-[11px] text-red-400 font-mono break-words">
+            <p className="text-xs font-bold text-red-600 font-mono wrap-break-word bg-white p-3 rounded-xl border-2 border-red-100 leading-relaxed">
               {errorMessage}
             </p>
           </div>
 
           {/* Stack trace */}
           {stackTrace && (
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                <Code2 className="h-3 w-3" /> Stack Trace
+            <div className="bg-slate-50 p-3 rounded-lg border-2 border-slate-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                <Code2 className="h-4 w-4 text-slate-300" /> Nerd Details
               </p>
-              <pre className="text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-40 border border-zinc-800">
+              <pre className="text-[10px] font-mono font-medium text-slate-600 bg-white rounded-xl p-3 overflow-x-auto max-h-40 border-2 border-slate-100">
                 {stackTrace}
               </pre>
             </div>
@@ -319,11 +319,11 @@ export function ErrorDetailsDialog({
 
           {/* Node config */}
           {nodeConfig && Object.keys(nodeConfig).length > 0 && (
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                <Cpu className="h-3 w-3" /> Node Config
+            <div className="bg-slate-50 p-3 rounded-lg border-2 border-slate-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-slate-300" /> Block Settings
               </p>
-              <pre className="text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+              <pre className="text-[10px] font-mono font-medium text-slate-600 bg-white rounded-xl p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
                 {JSON.stringify(nodeConfig, null, 2)}
               </pre>
             </div>
@@ -331,11 +331,11 @@ export function ErrorDetailsDialog({
 
           {/* Input data */}
           {step.input !== undefined && step.input !== null && (
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                <FileText className="h-3 w-3" /> Input Data
+            <div className="bg-slate-50 p-3 rounded-lg border-2 border-slate-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-300" /> What Went In
               </p>
-              <pre className="text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+              <pre className="text-[10px] font-mono font-medium text-slate-600 bg-white rounded-xl p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
                 {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
               </pre>
             </div>
@@ -343,11 +343,11 @@ export function ErrorDetailsDialog({
 
           {/* Output data */}
           {step.output !== undefined && step.output !== null && (
-            <div>
-              <p className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                <FileText className="h-3 w-3" /> Output
+            <div className="bg-slate-50 p-3 rounded-lg border-2 border-slate-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-300" /> What Came Out
               </p>
-              <pre className="text-[9px] font-mono text-zinc-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+              <pre className="text-[10px] font-mono font-medium text-slate-600 bg-white rounded-xl p-3 overflow-x-auto max-h-32 border-2 border-slate-100">
                 {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}
               </pre>
             </div>
@@ -355,14 +355,14 @@ export function ErrorDetailsDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+        <div className="flex items-center justify-end gap-2 pt-4 mt-2 border-t border-slate-100">
           <Button
             size="sm"
             variant="outline"
-            className="h-7 gap-1.5 text-[11px] border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+            className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-2 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all"
             onClick={handleCopyError}
           >
-            <Copy className="h-3 w-3" />
+            <Copy className="h-4 w-4" />
             Copy All Details
           </Button>
         </div>

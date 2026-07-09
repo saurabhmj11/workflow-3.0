@@ -30,27 +30,33 @@ export function ExecutionReplay() {
 
   if (results.length === 0) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="p-3 border-b border-zinc-800">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-400">AI Employee Activity</h3>
+      <div className="h-full flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <Clock className="w-4 h-4" /> Robot's Diary
+          </h3>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
-          <Clock className="h-6 w-6 mb-2 opacity-30" />
-          <p className="text-xs">No activity yet</p>
-          <p className="text-[10px] opacity-60">Run a workflow or try the AI Employee Demo</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6 text-center bg-white">
+          <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-4 border border-slate-100">
+            <Clock className="h-10 w-10 text-slate-300" />
+          </div>
+          <p className="text-base font-bold text-slate-500 mb-2">Nothing happened yet!</p>
+          <p className="text-xs font-medium text-slate-400 max-w-[200px]">Press play on your workflow to watch the robot work its magic!</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-zinc-800">
+    <div className="h-full flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden">
+      <div className="p-4 border-b border-slate-100 bg-slate-50/50">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-400">AI Employee Activity</h3>
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <Clock className="w-4 h-4" /> Robot's Diary
+          </h3>
           {isRunning && (
-            <Badge variant="secondary" className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border-blue-500/30">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" /> Working
+            <Badge variant="secondary" className="text-xs font-bold gap-1.5 bg-blue-100 text-blue-600 border-2 border-blue-200 rounded-xl px-3 py-1 shadow-sm">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working...
             </Badge>
           )}
         </div>
@@ -58,29 +64,29 @@ export function ExecutionReplay() {
 
       {/* Run selector */}
       {results.length > 1 && (
-        <div className="p-2 border-b border-zinc-800 space-y-1 max-h-24 overflow-y-auto">
+        <div className="p-3 border-b border-slate-100 bg-slate-50/30 space-y-2 max-h-32 overflow-y-auto">
           {results.slice(0, 5).map((r) => (
             <button
               key={r.runId}
               onClick={() => setActiveResult(r.runId)}
-              className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs ${
-                r.runId === activeResultId ? 'bg-cyan-500/10 text-cyan-400' : 'hover:bg-zinc-800/50 text-zinc-400'
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-bold transition-all border-2 ${
+                r.runId === activeResultId ? 'bg-white border-blue-200 text-blue-700 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-100 hover:border-slate-200 text-slate-500'
               }`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${
-                r.status === 'success' ? 'bg-emerald-500' :
-                r.status === 'error' ? 'bg-red-500' :
-                r.status === 'awaiting_approval' ? 'bg-amber-500' :
-                'bg-blue-500 animate-pulse'
+              <span className={`h-3.5 w-3.5 rounded-full ${
+                r.status === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' :
+                r.status === 'error' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]' :
+                r.status === 'awaiting_approval' ? 'bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]' :
+                'bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.5)]'
               }`} />
-              <span className="font-mono truncate">{r.runId.slice(0, 20)}</span>
+              <span className="font-mono truncate">{r.runId.slice(0, 10)}...</span>
             </button>
           ))}
         </div>
       )}
 
       {/* Active result — Timeline view */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-4 bg-white">
         {activeResult && (
           <ActiveResultView result={activeResult} isRunning={isRunning} />
         )}
@@ -215,58 +221,59 @@ function ActiveResultView({
   }, [errorSteps])
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-2">
       {/* Summary bar */}
-      <div className="flex items-center gap-3 mb-4 px-1">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <StatusBadge status={result.status} />
         {result.totalDurationMs > 0 && (
-          <span className="text-[10px] text-zinc-500 font-mono">{result.totalDurationMs}ms</span>
+          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">⏱️ {result.totalDurationMs}ms</span>
         )}
         {result.totalCostUsd && (
-          <span className="text-[10px] text-zinc-500 font-mono">${result.totalCostUsd}</span>
+          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">💰 ${result.totalCostUsd}</span>
         )}
-        <span className="text-[10px] text-zinc-600 font-mono">{result.steps.length} steps</span>
+        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">📋 {result.steps.length} steps</span>
       </div>
 
       {/* Error recovery actions — shown when execution has errors */}
       {hasErrors && !isRunning && (
-        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/5 p-2.5 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
-            <span className="text-[11px] font-medium text-red-400">
-              {errorSteps.length === 1 ? 'Execution failed' : `${errorSteps.length} steps failed`}
+        <div className="mb-6 rounded-[1.5rem] border border-red-100 bg-red-50 p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="bg-red-200 p-2 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <span className="text-sm font-bold text-red-600">
+              {errorSteps.length === 1 ? 'Oops! Something went wrong.' : `Oops! ${errorSteps.length} things went wrong.`}
             </span>
           </div>
 
           {/* Prominent error message for single error */}
           {errorSteps.length === 1 && errorSteps[0].error && (
-            <p className="text-[10px] text-red-400/80 font-mono break-words pl-5">
+            <p className="text-xs text-red-500 font-mono wrap-break-word pl-[3.25rem] font-medium leading-relaxed">
               {errorSteps[0].error}
             </p>
           )}
 
-          <div className="flex items-center gap-2 pl-5">
+          <div className="flex flex-wrap items-center gap-2 pl-[3.25rem] pt-1">
             <Button
               size="sm"
-              variant="outline"
-              className="h-7 gap-1.5 text-[11px] border-red-500/30 text-red-400 hover:text-red-200 hover:bg-red-500/10 hover:border-red-500/50"
+              className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-b border-red-700 bg-red-500 text-white hover:bg-red-400 hover:border-red-600 active:border-b-0 active:scale-[0.98] transition-all"
               onClick={handleRetry}
               disabled={retrying || isRunning}
             >
               {retrying ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <RefreshCw className="h-3 w-3" />
+                <RefreshCw className="h-4 w-4" />
               )}
-              Retry Workflow
+              Try Again!
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 text-[11px] border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+              className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-2 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all"
               onClick={handleCopyErrors}
             >
-              <Copy className="h-3 w-3" />
+              <Copy className="h-4 w-4" />
               Copy Error
             </Button>
           </div>
@@ -276,7 +283,7 @@ function ActiveResultView({
       {/* Timeline steps */}
       <div className="relative">
         {/* Timeline line */}
-        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-zinc-800" />
+        <div className="absolute left-[18px] top-4 bottom-4 w-1.5 bg-slate-100 rounded-full" />
 
         {result.steps.map((step, i) => {
           const cat = getCategoryForType(step.nodeType)
@@ -302,15 +309,15 @@ function ActiveResultView({
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'success':
-      return <Badge className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"><Check className="h-2.5 w-2.5" /> Complete</Badge>
+      return <Badge className="text-xs font-bold gap-1.5 bg-green-100 text-green-700 border-2 border-green-200 rounded-xl px-3 py-1 hover:bg-green-100"><Check className="h-3.5 w-3.5" /> All Done!</Badge>
     case 'error':
-      return <Badge className="text-[10px] gap-1 bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/10"><X className="h-2.5 w-2.5" /> Error</Badge>
+      return <Badge className="text-xs font-bold gap-1.5 bg-red-100 text-red-700 border-2 border-red-200 rounded-xl px-3 py-1 hover:bg-red-100"><X className="h-3.5 w-3.5" /> Uh Oh!</Badge>
     case 'running':
-      return <Badge className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/10"><Loader2 className="h-2.5 w-2.5 animate-spin" /> Working</Badge>
+      return <Badge className="text-xs font-bold gap-1.5 bg-blue-100 text-blue-700 border-2 border-blue-200 rounded-xl px-3 py-1 hover:bg-blue-100"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Working...</Badge>
     case 'awaiting_approval':
-      return <Badge className="text-[10px] gap-1 bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"><UserCheck className="h-2.5 w-2.5" /> Needs Approval</Badge>
+      return <Badge className="text-xs font-bold gap-1.5 bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl px-3 py-1 hover:bg-orange-100"><UserCheck className="h-3.5 w-3.5" /> Needs You!</Badge>
     default:
-      return <Badge variant="outline" className="text-[10px]">{status}</Badge>
+      return <Badge variant="outline" className="text-xs font-bold rounded-xl border-2 px-3 py-1 bg-white">{status}</Badge>
   }
 }
 
@@ -336,10 +343,10 @@ function TimelineStep({
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
 
   // Status dot color
-  const dotColor = step.status === 'running' ? 'bg-blue-500 ring-2 ring-blue-500/30 animate-pulse' :
-    step.status === 'success' ? 'bg-emerald-500' :
-    step.status === 'error' ? 'bg-red-500' :
-    'bg-zinc-600'
+  const dotColor = step.status === 'running' ? 'bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,0.6)]' :
+    step.status === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' :
+    step.status === 'error' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]' :
+    'bg-slate-300'
 
   const Icon = CATEGORY_ICONS[cat.category] ?? Zap
 
@@ -351,52 +358,52 @@ function TimelineStep({
   const isError = step.status === 'error'
 
   return (
-    <div className="relative flex gap-3 pb-4">
+    <div className="relative flex gap-4 pb-6 group">
       {/* Timeline dot */}
-      <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full ${dotColor} shrink-0 mt-0.5`}>
+      <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full ${dotColor} shrink-0 border border-white`}>
         {step.status === 'running' ? (
-          <Loader2 className="h-3 w-3 text-white animate-spin" />
+          <Loader2 className="h-4 w-4 text-white animate-spin" />
         ) : step.status === 'success' ? (
-          <Check className="h-3 w-3 text-white" />
+          <Check className="h-4 w-4 text-white font-bold" />
         ) : step.status === 'error' ? (
-          <X className="h-3 w-3 text-white" />
+          <X className="h-4 w-4 text-white font-bold" />
         ) : (
-          <Icon className="h-3 w-3 text-white" />
+          <Icon className="h-4 w-4 text-white" />
         )}
       </div>
 
       {/* Step content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 bg-white rounded-lg border border-slate-100 p-2 hover:border-blue-200 transition-colors shadow-sm">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full text-left hover:bg-zinc-800/30 rounded-md px-1.5 py-0.5 -mx-1.5 transition-colors"
+          className="w-full text-left rounded-xl px-2 py-1.5 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-medium truncate ${isError ? 'text-red-300' : 'text-zinc-200'}`}>{step.label}</span>
-            <span className={`text-[9px] ${isError ? 'text-red-400' : cat.color} font-mono shrink-0`}>{step.nodeType}</span>
-            {expanded ? <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0 ml-auto" /> : <ChevronRight className="h-3 w-3 text-zinc-500 shrink-0 ml-auto" />}
+            <span className={`text-sm font-bold truncate ${isError ? 'text-red-600' : 'text-slate-700'}`}>{step.label}</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'} shrink-0`}>{step.nodeType}</span>
+            {expanded ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-auto" /> : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0 ml-auto" />}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-2">
             {duration !== null && (
-              <span className="text-[10px] text-zinc-500 font-mono">{duration}ms</span>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">⏱️ {duration}ms</span>
             )}
             {step.tokenUsage && (
-              <span className="text-[10px] text-zinc-600 font-mono">{step.tokenUsage.prompt}+{step.tokenUsage.completion} tokens</span>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">🪙 {step.tokenUsage.prompt}+{step.tokenUsage.completion} tokens</span>
             )}
             {step.costUsd && (
-              <span className="text-[10px] text-zinc-600 font-mono">${step.costUsd}</span>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">💰 ${step.costUsd}</span>
             )}
           </div>
         </button>
 
         {/* Expanded output / error panel */}
         {expanded && (
-          <div className="mt-1.5 ml-1 space-y-1.5">
+          <div className="mt-3 px-2 pb-2 space-y-3">
             {/* Success output */}
-            {!isError && step.output && (
-              <div>
-                <p className="text-[10px] text-zinc-500 mb-1">Output:</p>
-                <pre className="text-[10px] font-mono text-emerald-400 bg-zinc-950 rounded p-2 overflow-x-auto max-h-32 border border-zinc-800">
+            {!isError && !!step.output && (
+              <div className="bg-white rounded-lg border-2 border-slate-100 p-3 shadow-inner">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">What happened:</p>
+                <pre className="text-xs font-mono font-medium text-slate-600 bg-slate-50 rounded-xl p-3 overflow-x-auto max-h-40">
                   {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}
                 </pre>
               </div>
@@ -413,9 +420,9 @@ function TimelineStep({
 
             {/* Non-error inline error display */}
             {!isError && step.error && (
-              <div className="flex items-start gap-1.5">
-                <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-amber-400">{step.error}</p>
+              <div className="flex items-center gap-2 bg-amber-50 p-3 rounded-xl border-2 border-amber-100 mt-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                <p className="text-xs font-bold text-amber-600">{step.error}</p>
               </div>
             )}
           </div>
@@ -423,13 +430,13 @@ function TimelineStep({
 
         {/* Quick action buttons for error steps (always visible, not just expanded) */}
         {isError && !expanded && (
-          <div className="flex items-center gap-1.5 mt-1">
+          <div className="flex items-center gap-2 mt-2 px-2 pb-1 border-t-2 border-slate-100 pt-2">
             <button
               onClick={(e) => { e.stopPropagation(); setErrorDialogOpen(true) }}
-              className="flex items-center gap-1 text-[9px] text-zinc-500 hover:text-zinc-300 transition-colors px-1 py-0.5 rounded hover:bg-zinc-800/50"
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-blue-50 border-2 border-transparent hover:border-blue-100"
             >
-              <Eye className="h-2.5 w-2.5" />
-              View Details
+              <Eye className="h-3.5 w-3.5" />
+              Look Closer
             </button>
             <button
               onClick={async (e) => {
@@ -442,10 +449,10 @@ function TimelineStep({
                   toast({ title: 'Copy failed', variant: 'destructive' })
                 }
               }}
-              className="flex items-center gap-1 text-[9px] text-zinc-500 hover:text-zinc-300 transition-colors px-1 py-0.5 rounded hover:bg-zinc-800/50"
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors px-3 py-1.5 rounded-xl hover:bg-slate-100 border-2 border-transparent hover:border-slate-200"
             >
-              <Copy className="h-2.5 w-2.5" />
-              Copy Error
+              <Copy className="h-3.5 w-3.5" />
+              Copy Oopsie
             </button>
           </div>
         )}

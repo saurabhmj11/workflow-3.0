@@ -1,5 +1,5 @@
 [build]
-  command = "npm run db:generate && npm run build"
+  command = "npx prisma generate && npm run build"
   publish = ".next"
 
 [[plugins]]
@@ -7,15 +7,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NEXT_PRIVATE_LOCAL_WEBPACK = "true"
   NEXT_TELEMETRY_DISABLED = "1"
-
-# Redirect all routes to Next.js handler
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/___netlify-handler"
-  status = 200
-  force = false
+  NEXT_PRIVATE_LOCAL_WEBPACK = "true"
 
 # Security headers
 [[headers]]

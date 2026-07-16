@@ -5,7 +5,7 @@ import { useExecutionStore } from '@/stores/execution-store'
 import { resumeWorkflow } from '@/lib/engine'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Check, X, Clock, Loader2, Star, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Check, X, Clock, Loader2, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { toast } from '@/hooks/use-toast'
 
@@ -17,7 +17,6 @@ export function ApprovalQueue() {
   const isRunning = useExecutionStore((s) => s.isRunning)
   const [resumingId, setResumingId] = useState<string | null>(null)
 
-  // Hydrate pending approvals from DB on mount
   useEffect(() => { hydrateFromDB() }, [hydrateFromDB])
 
   const pending = requests.filter((r) => r.status === 'pending')
@@ -28,10 +27,10 @@ export function ApprovalQueue() {
     try {
       updateStatus(id, 'approved', 'Approved via workflow builder')
       await resumeWorkflow(id, true)
-      toast({ title: 'YAY!', description: 'You said YES! Robot continues!' })
+      toast({ title: 'Approved', description: 'Workflow execution has resumed.' })
     } catch (err) {
       console.error('[OpenWorkflow] Resume failed:', err)
-      toast({ title: 'Oh no!', description: 'Something went wrong', variant: 'destructive' })
+      toast({ title: 'Resume failed', description: 'Could not resume the workflow.', variant: 'destructive' })
     } finally {
       setResumingId(null)
     }
@@ -42,82 +41,77 @@ export function ApprovalQueue() {
     try {
       updateStatus(id, 'rejected', 'Rejected via workflow builder')
       await resumeWorkflow(id, false)
-      toast({ title: 'Okay!', description: 'You said NO. Robot goes another way.' })
+      toast({ title: 'Rejected', description: 'Workflow execution was rejected.' })
     } catch (err) {
       console.error('[OpenWorkflow] Resume failed:', err)
-      toast({ title: 'Oh no!', description: 'Something went wrong', variant: 'destructive' })
+      toast({ title: 'Resume failed', description: 'Could not resume the workflow.', variant: 'destructive' })
     } finally {
       setResumingId(null)
     }
   }
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="p-4 border-b border-blue-100 bg-blue-50/50 rounded-t-3xl">
+    <div className="h-full flex flex-col bg-zinc-900">
+      <div className="p-4 border-b border-zinc-800">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-blue-500 flex items-center gap-2">
-            <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-            Your Choices!
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+            Approval Queue
           </h3>
           {pending.length > 0 && (
-            <Badge className="bg-pink-500 hover:bg-pink-600 text-white font-bold px-3 py-1 rounded-full text-sm">
-              {pending.length} Waiting!
+            <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+              {pending.length} pending
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {pending.length === 0 && resolved.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-40 text-blue-400 bg-blue-50 rounded-xl border border-dashed border-blue-200">
-            <Clock className="h-12 w-12 mb-3 text-blue-300" />
-            <p className="text-lg font-bold">Nothing to decide yet!</p>
-            <p className="text-sm font-medium mt-1">Run a robot that needs your help</p>
+          <div className="flex flex-col items-center justify-center h-36 text-zinc-600">
+            <Clock className="h-8 w-8 mb-2 text-zinc-700" />
+            <p className="text-xs font-medium text-zinc-500">No pending approvals</p>
+            <p className="text-[11px] text-zinc-600 mt-1">Approval nodes will appear here during execution.</p>
           </div>
         )}
 
         {pending.map((req) => {
-          const run = results.find((r) => r.runId === req.runId)
           const context = req.context as Record<string, unknown>
           const isResuming = resumingId === req.id
           return (
-            <div key={req.id} className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm hover:shadow-md transition-all">
+            <div key={req.id} className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 bg-orange-400 text-white rounded-lg flex items-center justify-center font-bold text-xl shadow-inner">
-                    ?
+                <div className="flex items-start gap-2.5">
+                  <div className="h-7 w-7 bg-amber-500/15 border border-amber-500/25 rounded-md flex items-center justify-center shrink-0 mt-0.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
                   </div>
-                  <div>
-                    <span className="text-lg font-bold text-orange-600">Robot Needs You!</span>
-                    <p className="text-sm text-orange-500 font-medium">
-                      Block: <span className="text-orange-700 font-bold">{context.nodeLabel as string}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-zinc-200">Approval Required</p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                      Node: <span className="text-zinc-300 font-medium">{context.nodeLabel as string}</span>
                     </p>
                   </div>
-                  {isResuming && <Loader2 className="h-6 w-6 animate-spin text-orange-400 ml-auto" />}
+                  {isResuming && <Loader2 className="h-4 w-4 animate-spin text-zinc-500 shrink-0" />}
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-2">
                   <Button
-                    size="lg"
-                    className="flex-1 h-14 rounded-lg bg-green-400 hover:bg-green-500 text-white font-bold text-lg border-b border-green-600 hover:border-b-0 hover:translate-y-1 transition-all"
+                    size="sm"
+                    className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-md border-0 gap-1.5"
                     onClick={() => handleApprove(req.id)}
                     disabled={isResuming || isRunning}
                   >
-                    {isResuming ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                      <>
-                        <ThumbsUp className="h-6 w-6 mr-2" />
-                        YES!
-                      </>
-                    )}
+                    {isResuming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                    Approve
                   </Button>
                   <Button
-                    size="lg"
-                    className="flex-1 h-14 rounded-lg bg-red-400 hover:bg-red-500 text-white font-bold text-lg border-b border-red-600 hover:border-b-0 hover:translate-y-1 transition-all"
+                    size="sm"
+                    className="flex-1 h-8 text-xs bg-zinc-700 hover:bg-red-600/80 text-zinc-200 hover:text-white font-medium rounded-md border-0 gap-1.5 transition-colors"
                     onClick={() => handleReject(req.id)}
                     disabled={isResuming || isRunning}
                   >
-                    <ThumbsDown className="h-6 w-6 mr-2" />
-                    NO
+                    <XCircle className="h-3.5 w-3.5" />
+                    Reject
                   </Button>
                 </div>
               </div>
@@ -126,23 +120,27 @@ export function ApprovalQueue() {
         })}
 
         {resolved.map((req) => (
-          <div key={req.id} className={`rounded-xl border p-3 shadow-sm ${
-            req.status === 'approved' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+          <div key={req.id} className={`rounded-lg border p-2.5 ${
+            req.status === 'approved'
+              ? 'border-emerald-500/20 bg-emerald-500/5'
+              : 'border-red-500/20 bg-red-500/5'
           }`}>
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shadow-inner ${
-                req.status === 'approved' ? 'bg-green-400 text-white' : 'bg-red-400 text-white'
+            <div className="flex items-center gap-2">
+              <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${
+                req.status === 'approved' ? 'bg-emerald-500/20' : 'bg-red-500/20'
               }`}>
                 {req.status === 'approved' ? (
-                  <Check className="h-6 w-6" />
+                  <Check className="h-3 w-3 text-emerald-400" />
                 ) : (
-                  <X className="h-6 w-6" />
+                  <X className="h-3 w-3 text-red-400" />
                 )}
               </div>
-              <span className={`text-base font-bold ${
-                req.status === 'approved' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {(req.context as Record<string, unknown>).nodeLabel as string} — {req.status === 'approved' ? 'You said YES!' : 'You said NO'}
+              <span className="text-[11px] text-zinc-400 truncate">
+                <span className="text-zinc-300 font-medium">{(req.context as Record<string, unknown>).nodeLabel as string}</span>
+                {' — '}
+                <span className={req.status === 'approved' ? 'text-emerald-400' : 'text-red-400'}>
+                  {req.status === 'approved' ? 'Approved' : 'Rejected'}
+                </span>
               </span>
             </div>
           </div>

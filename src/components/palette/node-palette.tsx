@@ -71,48 +71,46 @@ export function NodePalette() {
   }
 
   return (
-    <div className="w-72 border-r border-slate-200 bg-white overflow-y-auto flex flex-col shadow-sm z-10">
-      <div className="p-4 border-b border-border text-center">
-        <h3 className="text-xl font-semibold text-foreground">Node Palette</h3>
-        <p className="text-sm font-medium text-muted-foreground mt-1">Drag nodes to canvas</p>
+    <div className="w-64 border-r border-zinc-800 bg-zinc-900 overflow-y-auto flex flex-col z-10">
+      <div className="p-4 border-b border-zinc-800">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Nodes</h3>
       </div>
       {/* Search input */}
-      <div className="p-4 border-b border-slate-100">
+      <div className="p-3 border-b border-zinc-800">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <Input
             type="text"
-            placeholder="Find a block..."
+            placeholder="Search blocks..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-10 pl-10 pr-10 text-sm bg-background border border-input rounded-md text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-8 pl-8 pr-8 text-xs bg-zinc-800 border border-zinc-700 rounded-md text-zinc-200 placeholder:text-zinc-500 focus-visible:ring-1 focus-visible:ring-violet-500 focus-visible:border-violet-500"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       </div>
-      <div className="p-4 space-y-6 flex-1 overflow-y-auto">
+      <div className="p-3 space-y-4 flex-1 overflow-y-auto">
         {filteredCategories.length === 0 && (
-          <div className="py-10 text-center bg-slate-50 rounded-xl border border-slate-100 border-dashed">
-            <p className="text-xl font-medium text-muted-foreground">No results found</p>
-            <p className="text-sm text-muted-foreground mt-2">Try a different search term.</p>
+          <div className="py-8 text-center rounded-lg border border-zinc-800 border-dashed">
+            <p className="text-xs font-medium text-zinc-500">No results found</p>
           </div>
         )}
         {filteredCategories.map((cat) => (
           <div key={cat.category}>
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-t-md border-b border-border">
-              <span className={`text-xs font-semibold uppercase tracking-wider ${cat.color.replace('400', '600')}`}>
+            <div className="flex items-center gap-2 px-1 mb-1.5">
+              <span className={`text-[10px] font-semibold uppercase tracking-widest ${cat.color}`}>
                 {cat.label}
               </span>
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">{cat.types.length}</span>
+              <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded">{cat.types.length}</span>
             </div>
-            <div className="space-y-2 pt-3 pb-1">
+            <div className="space-y-0.5">
               {cat.types.map((type) => {
                 const Icon = getNodeIcon(type, cat.category)
                 return (
@@ -121,12 +119,12 @@ export function NodePalette() {
                     draggable
                     onDragStart={(e) => handleDragStart(e, type as NodeType, cat)}
                     onClick={() => handleClick(type as NodeType, cat)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left border border-transparent hover:bg-muted bg-background hover:border-border transition-colors group`}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-left hover:bg-zinc-800 transition-colors group"
                   >
-                    <div className={`p-1.5 rounded-md ${cat.color.replace('text-', 'bg-').replace('400', '100')}`}>
-                      <Icon className={`h-5 w-5 ${cat.color.replace('400', '600')} shrink-0`} />
+                    <div className={`p-1.5 rounded-md bg-zinc-800 group-hover:bg-zinc-700 transition-colors shrink-0`}>
+                      <Icon className={`h-3.5 w-3.5 ${cat.color} shrink-0`} />
                     </div>
-                    <span className="text-sm font-medium text-foreground group-hover:text-foreground capitalize">
+                    <span className="text-xs font-medium text-zinc-300 group-hover:text-zinc-100 capitalize">
                       {type.replace('-', ' ')}
                     </span>
                   </button>

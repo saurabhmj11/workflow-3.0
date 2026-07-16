@@ -5,19 +5,18 @@ import { useExecutionStore } from '@/stores/execution-store'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getCategoryForType, NODE_CATEGORIES, type NodeType, type NodeExecutionStatus, type NodeExecutionStep } from '@/lib/types'
+import { getCategoryForType, type NodeType, type NodeExecutionStep } from '@/lib/types'
 import { executeWorkflow } from '@/lib/engine'
 import { ExecutionErrorPanel, ErrorDetailsDialog } from '@/components/execution/execution-error-panel'
-import { Check, X, Clock, Loader2, AlertTriangle, ChevronDown, ChevronRight, Zap, Brain, UserCheck, GitBranch, Plug, RefreshCw, Copy, Eye } from 'lucide-react'
+import {
+  Check, X, Clock, Loader2, AlertTriangle,
+  ChevronDown, ChevronRight, Zap, Brain, UserCheck,
+  GitBranch, Plug, RefreshCw, Copy, Eye, Activity,
+} from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
-// Category icons for the timeline
 const CATEGORY_ICONS: Record<string, typeof Zap> = {
-  trigger: Zap,
-  ai: Brain,
-  human: UserCheck,
-  logic: GitBranch,
-  action: Plug,
+  trigger: Zap, ai: Brain, human: UserCheck, logic: GitBranch, action: Plug,
 }
 
 export function ExecutionReplay() {
@@ -25,78 +24,72 @@ export function ExecutionReplay() {
   const activeResultId = useExecutionStore((s) => s.activeResultId)
   const isRunning = useExecutionStore((s) => s.isRunning)
   const setActiveResult = useExecutionStore((s) => s.setActiveResult)
-
   const activeResult = results.find((r) => r.runId === activeResultId)
 
   if (results.length === 0) {
     return (
-      <div className="h-full flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            <Clock className="w-4 h-4" /> Robot's Diary
+      <div className="h-full flex flex-col bg-zinc-900">
+        <div className="p-4 border-b border-zinc-800">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-violet-400" />
+            Execution Log
           </h3>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6 text-center bg-white">
-          <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-4 border border-slate-100">
-            <Clock className="h-10 w-10 text-slate-300" />
-          </div>
-          <p className="text-base font-bold text-slate-500 mb-2">Nothing happened yet!</p>
-          <p className="text-xs font-medium text-slate-400 max-w-[200px]">Press play on your workflow to watch the robot work its magic!</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 p-6 text-center">
+          <Clock className="h-8 w-8 mb-2 text-zinc-700" />
+          <p className="text-xs font-medium text-zinc-500">No executions yet</p>
+          <p className="text-[11px] text-zinc-600 mt-1">Run your workflow to see the execution trace here.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-[2rem] border border-slate-100 overflow-hidden">
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+    <div className="h-full flex flex-col bg-zinc-900">
+      <div className="p-4 border-b border-zinc-800">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            <Clock className="w-4 h-4" /> Robot's Diary
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-violet-400" />
+            Execution Log
           </h3>
           {isRunning && (
-            <Badge variant="secondary" className="text-xs font-bold gap-1.5 bg-blue-100 text-blue-600 border-2 border-blue-200 rounded-xl px-3 py-1 shadow-sm">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working...
+            <Badge className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/25 rounded-full px-2 py-0.5">
+              <Loader2 className="h-3 w-3 animate-spin" /> Running
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Run selector */}
       {results.length > 1 && (
-        <div className="p-3 border-b border-slate-100 bg-slate-50/30 space-y-2 max-h-32 overflow-y-auto">
+        <div className="p-2 border-b border-zinc-800 space-y-1 max-h-28 overflow-y-auto">
           {results.slice(0, 5).map((r) => (
             <button
               key={r.runId}
               onClick={() => setActiveResult(r.runId)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-bold transition-all border-2 ${
-                r.runId === activeResultId ? 'bg-white border-blue-200 text-blue-700 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-100 hover:border-slate-200 text-slate-500'
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left text-xs transition-colors ${
+                r.runId === activeResultId
+                  ? 'bg-zinc-800 text-zinc-100'
+                  : 'text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300'
               }`}
             >
-              <span className={`h-3.5 w-3.5 rounded-full ${
-                r.status === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' :
-                r.status === 'error' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]' :
-                r.status === 'awaiting_approval' ? 'bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]' :
-                'bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.5)]'
+              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                r.status === 'success' ? 'bg-emerald-400' :
+                r.status === 'error' ? 'bg-red-400' :
+                r.status === 'awaiting_approval' ? 'bg-amber-400' :
+                'bg-blue-400 animate-pulse'
               }`} />
-              <span className="font-mono truncate">{r.runId.slice(0, 10)}...</span>
+              <span className="font-mono truncate">{r.runId.slice(0, 14)}…</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Active result — Timeline view */}
-      <div className="flex-1 overflow-y-auto p-4 bg-white">
-        {activeResult && (
-          <ActiveResultView result={activeResult} isRunning={isRunning} />
-        )}
+      <div className="flex-1 overflow-y-auto p-3 bg-zinc-900">
+        {activeResult && <ActiveResultView result={activeResult} isRunning={isRunning} />}
       </div>
     </div>
   )
 }
-
-// ─── Active Result View ───────────────────────────
-// Contains the summary bar, retry/copy buttons, and timeline
 
 function ActiveResultView({
   result,
@@ -108,199 +101,111 @@ function ActiveResultView({
   const [retrying, setRetrying] = useState(false)
   const storeNodes = useWorkflowStore((s) => s.nodes)
   const storeEdges = useWorkflowStore((s) => s.edges)
-
-  // Find error steps
   const errorSteps = result.steps.filter((s) => s.status === 'error')
   const hasErrors = result.status === 'error' || errorSteps.length > 0
 
-  // ─── Retry the entire workflow ──────────────────
   const handleRetry = useCallback(async () => {
     if (isRunning || retrying) return
     setRetrying(true)
-
     try {
-      // First try server-side retry (if execution is persisted)
       const res = await fetch(`/api/executions/${result.runId}/retry`, { method: 'POST' })
       const json = await res.json()
-
-      if (json.ok) {
-        // Server retry succeeded — now re-execute client-side with current nodes/edges
-        const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
-        const edgesSnapshot = [...storeEdges]
-
-        executeWorkflow(json.data.workflowId, nodesSnapshot, edgesSnapshot, json.data.input ?? {}).catch((err) => {
-          console.error('[OpenWorkflow] Retry execution failed:', err)
-          useExecutionStore.getState().forceResetRunning()
-          toast({ title: 'Retry failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' })
-        })
-
-        toast({ title: 'Retrying execution', description: `New run: ${json.data.runId.slice(0, 20)}` })
-      } else {
-        // Fallback to client-side retry with current workflow state
-        const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
-        const edgesSnapshot = [...storeEdges]
-
-        if (nodesSnapshot.length === 0) {
-          toast({ title: 'Cannot retry', description: 'No workflow nodes available for retry', variant: 'destructive' })
-          return
-        }
-
-        executeWorkflow(result.workflowId, nodesSnapshot, edgesSnapshot).catch((err) => {
-          console.error('[OpenWorkflow] Retry execution failed:', err)
-          useExecutionStore.getState().forceResetRunning()
-          toast({ title: 'Retry failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' })
-        })
-
-        toast({ title: 'Retrying execution', description: 'Running workflow from the beginning' })
-      }
-    } catch (err) {
-      // API call failed — still try client-side retry
       const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
       const edgesSnapshot = [...storeEdges]
-
-      if (nodesSnapshot.length > 0) {
+      if (json.ok) {
+        executeWorkflow(json.data.workflowId, nodesSnapshot, edgesSnapshot, json.data.input ?? {}).catch(() => {
+          useExecutionStore.getState().forceResetRunning()
+        })
+        toast({ title: 'Retrying', description: `New run: ${json.data.runId.slice(0, 20)}` })
+      } else if (nodesSnapshot.length > 0) {
         executeWorkflow(result.workflowId, nodesSnapshot, edgesSnapshot).catch(() => {
           useExecutionStore.getState().forceResetRunning()
         })
+        toast({ title: 'Retrying', description: 'Running workflow from the beginning.' })
       }
-      toast({ title: 'Retrying...', description: 'Running workflow from the beginning' })
+    } catch {
+      const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
+      if (nodesSnapshot.length > 0) executeWorkflow(result.workflowId, nodesSnapshot, [...storeEdges]).catch(() => {})
+      toast({ title: 'Retrying', description: 'Running workflow from the beginning.' })
     } finally {
-      // Reset after a short delay so the user sees the loading state
       setTimeout(() => setRetrying(false), 1500)
     }
   }, [result.runId, result.workflowId, isRunning, retrying, storeNodes, storeEdges])
 
-  // ─── Retry from a specific step ─────────────────
-  const handleRetryFromStep = useCallback((step: NodeExecutionStep) => {
-    if (isRunning) return
-
-    // For step-level retry, we re-run the entire workflow but mark the step
-    // as pending in the UI so it gets re-executed
-    const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
-    const edgesSnapshot = [...storeEdges]
-
-    if (nodesSnapshot.length === 0) {
-      toast({ title: 'Cannot retry', description: 'No workflow nodes available', variant: 'destructive' })
-      return
-    }
-
-    executeWorkflow(result.workflowId, nodesSnapshot, edgesSnapshot).catch((err) => {
-      console.error('[OpenWorkflow] Step retry failed:', err)
-      useExecutionStore.getState().forceResetRunning()
-      toast({ title: 'Retry failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' })
-    })
-
-    toast({ title: 'Retrying from step', description: `Re-running from "${step.label}"` })
-  }, [result.workflowId, isRunning, storeNodes, storeEdges])
-
-  // ─── Copy all error details ─────────────────────
   const handleCopyErrors = useCallback(async () => {
     if (errorSteps.length === 0) return
-
-    const details = errorSteps.map((step, i) => {
-      const lines = [
-        `[Error ${i + 1}] Node: ${step.label} (${step.nodeType})`,
-        `Node ID: ${step.nodeId}`,
-        `Message: ${step.error || 'Unknown error'}`,
-      ]
-      if (step.input) {
-        lines.push(`Input: ${typeof step.input === 'string' ? step.input : JSON.stringify(step.input)}`)
-      }
-      if (step.output) {
-        lines.push(`Output: ${typeof step.output === 'string' ? step.output : JSON.stringify(step.output)}`)
-      }
-      return lines.join('\n')
-    }).join('\n\n')
-
+    const details = errorSteps.map((s, i) =>
+      `[Error ${i + 1}] Node: ${s.label} (${s.nodeType})\nMessage: ${s.error || 'Unknown error'}`
+    ).join('\n\n')
     try {
       await navigator.clipboard.writeText(details)
-      toast({ title: 'Copied', description: `${errorSteps.length} error(s) copied to clipboard` })
+      toast({ title: 'Copied', description: `${errorSteps.length} error(s) copied to clipboard.` })
     } catch {
-      toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' })
+      toast({ title: 'Copy failed', variant: 'destructive' })
     }
   }, [errorSteps])
 
+  const handleRetryFromStep = useCallback((step: NodeExecutionStep) => {
+    if (isRunning) return
+    const nodesSnapshot = storeNodes.map(n => ({ ...n, config: { ...n.config } }))
+    if (nodesSnapshot.length === 0) { toast({ title: 'Cannot retry', variant: 'destructive' }); return }
+    executeWorkflow(result.workflowId, nodesSnapshot, [...storeEdges]).catch(() => {
+      useExecutionStore.getState().forceResetRunning()
+    })
+    toast({ title: 'Retrying from node', description: `"${step.label}"` })
+  }, [result.workflowId, isRunning, storeNodes, storeEdges])
+
   return (
-    <div className="space-y-2">
-      {/* Summary bar */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
         <StatusBadge status={result.status} />
         {result.totalDurationMs > 0 && (
-          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">⏱️ {result.totalDurationMs}ms</span>
+          <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+            {result.totalDurationMs}ms
+          </span>
         )}
-        {result.totalCostUsd && (
-          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">💰 ${result.totalCostUsd}</span>
-        )}
-        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border-2 border-slate-200 px-2.5 py-1 rounded-xl">📋 {result.steps.length} steps</span>
+        <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+          {result.steps.length} steps
+        </span>
       </div>
 
-      {/* Error recovery actions — shown when execution has errors */}
       {hasErrors && !isRunning && (
-        <div className="mb-6 rounded-[1.5rem] border border-red-100 bg-red-50 p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-red-200 p-2 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-            </div>
-            <span className="text-sm font-bold text-red-600">
-              {errorSteps.length === 1 ? 'Oops! Something went wrong.' : `Oops! ${errorSteps.length} things went wrong.`}
+        <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+            <span className="text-xs font-medium text-red-400">
+              {errorSteps.length === 1 ? 'Execution error' : `${errorSteps.length} errors`}
             </span>
           </div>
-
-          {/* Prominent error message for single error */}
           {errorSteps.length === 1 && errorSteps[0].error && (
-            <p className="text-xs text-red-500 font-mono wrap-break-word pl-[3.25rem] font-medium leading-relaxed">
-              {errorSteps[0].error}
-            </p>
+            <p className="text-[11px] text-red-300/70 font-mono pl-5 break-all">{errorSteps[0].error}</p>
           )}
-
-          <div className="flex flex-wrap items-center gap-2 pl-[3.25rem] pt-1">
-            <Button
-              size="sm"
-              className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-b border-red-700 bg-red-500 text-white hover:bg-red-400 hover:border-red-600 active:border-b-0 active:scale-[0.98] transition-all"
-              onClick={handleRetry}
-              disabled={retrying || isRunning}
-            >
-              {retrying ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Try Again!
+          <div className="flex items-center gap-2 pl-5">
+            <Button size="sm" className="h-7 px-2.5 text-xs bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/25 rounded gap-1.5"
+              onClick={handleRetry} disabled={retrying || isRunning}>
+              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Retry
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-10 px-4 gap-2 text-sm font-bold rounded-lg border-2 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all"
-              onClick={handleCopyErrors}
-            >
-              <Copy className="h-4 w-4" />
-              Copy Error
+            <Button size="sm" variant="ghost" className="h-7 px-2.5 text-xs text-zinc-500 hover:text-zinc-300 gap-1.5"
+              onClick={handleCopyErrors}>
+              <Copy className="h-3 w-3" /> Copy errors
             </Button>
           </div>
         </div>
       )}
 
-      {/* Timeline steps */}
-      <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute left-[18px] top-4 bottom-4 w-1.5 bg-slate-100 rounded-full" />
-
-        {result.steps.map((step, i) => {
-          const cat = getCategoryForType(step.nodeType)
-          const isLast = i === result.steps.length - 1
-
-          return (
-            <TimelineStep
-              key={step.nodeId}
-              step={step}
-              index={i}
-              cat={cat}
-              isLast={isLast}
-              onRetryFromStep={handleRetryFromStep}
-              isRetrying={retrying || isRunning}
-            />
-          )
-        })}
+      <div className="relative space-y-1">
+        {result.steps.map((step, i) => (
+          <TimelineStep
+            key={step.nodeId}
+            step={step}
+            index={i}
+            cat={getCategoryForType(step.nodeType)}
+            isLast={i === result.steps.length - 1}
+            onRetryFromStep={handleRetryFromStep}
+            isRetrying={retrying || isRunning}
+          />
+        ))}
       </div>
     </div>
   )
@@ -309,28 +214,20 @@ function ActiveResultView({
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'success':
-      return <Badge className="text-xs font-bold gap-1.5 bg-green-100 text-green-700 border-2 border-green-200 rounded-xl px-3 py-1 hover:bg-green-100"><Check className="h-3.5 w-3.5" /> All Done!</Badge>
+      return <Badge className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-0.5 hover:bg-emerald-500/10"><Check className="h-3 w-3" /> Completed</Badge>
     case 'error':
-      return <Badge className="text-xs font-bold gap-1.5 bg-red-100 text-red-700 border-2 border-red-200 rounded-xl px-3 py-1 hover:bg-red-100"><X className="h-3.5 w-3.5" /> Uh Oh!</Badge>
+      return <Badge className="text-[10px] gap-1 bg-red-500/10 text-red-400 border border-red-500/25 rounded-full px-2 py-0.5 hover:bg-red-500/10"><X className="h-3 w-3" /> Failed</Badge>
     case 'running':
-      return <Badge className="text-xs font-bold gap-1.5 bg-blue-100 text-blue-700 border-2 border-blue-200 rounded-xl px-3 py-1 hover:bg-blue-100"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Working...</Badge>
+      return <Badge className="text-[10px] gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/25 rounded-full px-2 py-0.5 hover:bg-blue-500/10"><Loader2 className="h-3 w-3 animate-spin" /> Running</Badge>
     case 'awaiting_approval':
-      return <Badge className="text-xs font-bold gap-1.5 bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-xl px-3 py-1 hover:bg-orange-100"><UserCheck className="h-3.5 w-3.5" /> Needs You!</Badge>
+      return <Badge className="text-[10px] gap-1 bg-amber-500/10 text-amber-400 border border-amber-500/25 rounded-full px-2 py-0.5 hover:bg-amber-500/10"><UserCheck className="h-3 w-3" /> Awaiting Approval</Badge>
     default:
-      return <Badge variant="outline" className="text-xs font-bold rounded-xl border-2 px-3 py-1 bg-white">{status}</Badge>
+      return <Badge variant="outline" className="text-[10px] rounded-full border px-2 py-0.5 text-zinc-400">{status}</Badge>
   }
 }
 
-// ─── Timeline Step ────────────────────────────────
-// Enhanced with error panel, view details, and copy for error steps
-
 function TimelineStep({
-  step,
-  index,
-  cat,
-  isLast,
-  onRetryFromStep,
-  isRetrying,
+  step, index, cat, isLast, onRetryFromStep, isRetrying,
 }: {
   step: ReturnType<typeof useExecutionStore.getState>['results'][0]['steps'][0]
   index: number
@@ -341,129 +238,80 @@ function TimelineStep({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
-
-  // Status dot color
-  const dotColor = step.status === 'running' ? 'bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,0.6)]' :
-    step.status === 'success' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' :
-    step.status === 'error' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]' :
-    'bg-slate-300'
-
   const Icon = CATEGORY_ICONS[cat.category] ?? Zap
-
-  // Duration
+  const isError = step.status === 'error'
   const duration = step.startedAt && step.finishedAt
     ? new Date(step.finishedAt).getTime() - new Date(step.startedAt).getTime()
     : null
 
-  const isError = step.status === 'error'
-
   return (
-    <div className="relative flex gap-4 pb-6 group">
-      {/* Timeline dot */}
-      <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full ${dotColor} shrink-0 border border-white`}>
-        {step.status === 'running' ? (
-          <Loader2 className="h-4 w-4 text-white animate-spin" />
-        ) : step.status === 'success' ? (
-          <Check className="h-4 w-4 text-white font-bold" />
-        ) : step.status === 'error' ? (
-          <X className="h-4 w-4 text-white font-bold" />
-        ) : (
-          <Icon className="h-4 w-4 text-white" />
-        )}
+    <div className="flex gap-2.5 group">
+      <div className={`relative flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 ${
+        step.status === 'running' ? 'bg-blue-500/20 border border-blue-500/40' :
+        step.status === 'success' ? 'bg-emerald-500/15 border border-emerald-500/30' :
+        step.status === 'error' ? 'bg-red-500/15 border border-red-500/30' :
+        'bg-zinc-800 border border-zinc-700'
+      }`}>
+        {step.status === 'running' ? <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin" /> :
+         step.status === 'success' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> :
+         step.status === 'error' ? <X className="h-3.5 w-3.5 text-red-400" /> :
+         <Icon className="h-3.5 w-3.5 text-zinc-500" />}
+        {!isLast && <div className="absolute top-7 left-1/2 -translate-x-1/2 w-px h-full bg-zinc-800" />}
       </div>
 
-      {/* Step content */}
-      <div className="flex-1 min-w-0 bg-white rounded-lg border border-slate-100 p-2 hover:border-blue-200 transition-colors shadow-sm">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full text-left rounded-xl px-2 py-1.5 transition-colors"
-        >
+      <div className="flex-1 min-w-0 mb-3">
+        <button onClick={() => setExpanded(!expanded)}
+          className="w-full text-left rounded-lg bg-zinc-800/50 border border-zinc-800 hover:border-zinc-700 px-3 py-2 transition-colors">
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-bold truncate ${isError ? 'text-red-600' : 'text-slate-700'}`}>{step.label}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'} shrink-0`}>{step.nodeType}</span>
-            {expanded ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-auto" /> : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0 ml-auto" />}
+            <span className={`text-xs font-medium truncate ${isError ? 'text-red-400' : 'text-zinc-200'}`}>
+              {step.label}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
+              isError ? 'bg-red-500/10 text-red-400' : 'bg-zinc-900 text-zinc-500'
+            }`}>{step.nodeType}</span>
+            <span className="ml-auto text-zinc-600 shrink-0">
+              {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </span>
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            {duration !== null && (
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">⏱️ {duration}ms</span>
-            )}
-            {step.tokenUsage && (
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">🪙 {step.tokenUsage.prompt}+{step.tokenUsage.completion} tokens</span>
-            )}
-            {step.costUsd && (
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">💰 ${step.costUsd}</span>
-            )}
-          </div>
+          {duration !== null && (
+            <span className="text-[10px] text-zinc-600 mt-1 block">{duration}ms</span>
+          )}
         </button>
 
-        {/* Expanded output / error panel */}
         {expanded && (
-          <div className="mt-3 px-2 pb-2 space-y-3">
-            {/* Success output */}
+          <div className="mt-1 px-3 pb-2 space-y-2 bg-zinc-800/30 rounded-b-lg border border-t-0 border-zinc-800">
             {!isError && !!step.output && (
-              <div className="bg-white rounded-lg border-2 border-slate-100 p-3 shadow-inner">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">What happened:</p>
-                <pre className="text-xs font-mono font-medium text-slate-600 bg-slate-50 rounded-xl p-3 overflow-x-auto max-h-40">
+              <div className="pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Output</p>
+                <pre className="text-[11px] font-mono text-zinc-400 bg-zinc-900 rounded p-2 overflow-x-auto max-h-32 break-all whitespace-pre-wrap">
                   {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}
                 </pre>
               </div>
             )}
-
-            {/* Error panel — detailed error information with actions */}
             {isError && (
-              <ExecutionErrorPanel
-                step={step}
-                onRetryFromStep={onRetryFromStep}
-                isRetrying={isRetrying}
-              />
-            )}
-
-            {/* Non-error inline error display */}
-            {!isError && step.error && (
-              <div className="flex items-center gap-2 bg-amber-50 p-3 rounded-xl border-2 border-amber-100 mt-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                <p className="text-xs font-bold text-amber-600">{step.error}</p>
-              </div>
+              <ExecutionErrorPanel step={step} onRetryFromStep={onRetryFromStep} isRetrying={isRetrying} />
             )}
           </div>
         )}
 
-        {/* Quick action buttons for error steps (always visible, not just expanded) */}
         {isError && !expanded && (
-          <div className="flex items-center gap-2 mt-2 px-2 pb-1 border-t-2 border-slate-100 pt-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); setErrorDialogOpen(true) }}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-blue-50 border-2 border-transparent hover:border-blue-100"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Look Closer
+          <div className="flex items-center gap-2 mt-1 px-1">
+            <button onClick={(e) => { e.stopPropagation(); setErrorDialogOpen(true) }}
+              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-blue-400 transition-colors">
+              <Eye className="h-3 w-3" /> View details
             </button>
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                try {
-                  const details = `Error in ${step.label} (${step.nodeType}): ${step.error || 'Unknown'}`
-                  await navigator.clipboard.writeText(details)
-                  toast({ title: 'Copied', description: 'Error message copied' })
-                } catch {
-                  toast({ title: 'Copy failed', variant: 'destructive' })
-                }
-              }}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors px-3 py-1.5 rounded-xl hover:bg-slate-100 border-2 border-transparent hover:border-slate-200"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copy Oopsie
+            <button onClick={async (e) => {
+              e.stopPropagation()
+              try { await navigator.clipboard.writeText(`Error in ${step.label}: ${step.error || 'Unknown'}`) 
+                    toast({ title: 'Copied' }) } catch { toast({ title: 'Copy failed', variant: 'destructive' }) }
+            }} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+              <Copy className="h-3 w-3" /> Copy
             </button>
           </div>
         )}
 
-        {/* Error details dialog */}
         {isError && (
-          <ErrorDetailsDialog
-            open={errorDialogOpen}
-            onOpenChange={setErrorDialogOpen}
-            step={step}
-          />
+          <ErrorDetailsDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen} step={step} />
         )}
       </div>
     </div>

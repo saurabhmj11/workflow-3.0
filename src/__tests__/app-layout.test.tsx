@@ -44,7 +44,7 @@ describe('AppSidebar', () => {
     expect(screen.queryByText('AI Workflow Platform')).not.toBeInTheDocument()
   })
 
-  it('renders all 12 navigation items', () => {
+  it('renders the core navigation items', () => {
     render(
       <AppSidebar
         collapsed={false}
@@ -53,18 +53,11 @@ describe('AppSidebar', () => {
         onMobileClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Home')).toBeInTheDocument()
-    expect(screen.getByText('Builder')).toBeInTheDocument()
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Analytics')).toBeInTheDocument()
-    expect(screen.getByText('Integrations')).toBeInTheDocument()
-    expect(screen.getByText('Memory / CRM')).toBeInTheDocument()
-    expect(screen.getByText('Deployments')).toBeInTheDocument()
-    expect(screen.getByText('Testing')).toBeInTheDocument()
-    expect(screen.getByText('Observability')).toBeInTheDocument()
-    expect(screen.getByText('Plugins')).toBeInTheDocument()
-    expect(screen.getByText('Audit Trail')).toBeInTheDocument()
-    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.getAllByText('Dashboard')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Build')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Test')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Deploy')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Embed')[0]).toBeInTheDocument()
   })
 
   it('highlights the active route', () => {
@@ -131,8 +124,8 @@ describe('AppSidebar', () => {
 // ─── PAGE_META Tests ───────────────────────────────────
 
 describe('PAGE_META', () => {
-  it('has metadata for all main routes', () => {
-    const expectedRoutes = ['/', '/dashboard', '/analytics', '/integrations', '/memory', '/deploy', '/test', '/observability', '/plugins', '/audit', '/settings']
+  it('has metadata for core routes', () => {
+    const expectedRoutes = ['/', '/dashboard', '/build', '/test', '/deploy', '/embed']
     for (const route of expectedRoutes) {
       expect(PAGE_META[route]).toBeDefined()
       expect(PAGE_META[route].title).toBeTruthy()
@@ -156,7 +149,8 @@ describe('EXCLUDED_ROUTES', () => {
 
 describe('AppLayout', () => {
   beforeEach(() => {
-    mockPathname.mockReturnValue('/')
+    // Mock pathname to a route that uses the layout (e.g. /dashboard)
+    mockPathname.mockReturnValue('/dashboard')
   })
 
   it('renders sidebar and header for normal routes', () => {
@@ -166,7 +160,7 @@ describe('AppLayout', () => {
       </AppLayout>
     )
     expect(screen.getByTestId('page-content')).toBeInTheDocument()
-    expect(screen.getByText('OpenWorkflow Platform')).toBeInTheDocument()
+    expect(screen.getAllByText('Dashboard')[0]).toBeInTheDocument() // Title from PAGE_META
   })
 
   it('excludes layout for builder route', () => {
@@ -193,13 +187,13 @@ describe('AppLayout', () => {
   })
 
   it('displays correct page title based on route', () => {
-    mockPathname.mockReturnValue('/analytics')
+    mockPathname.mockReturnValue('/deploy')
     render(
       <AppLayout>
-        <div>Analytics Content</div>
+        <div>Deploy Content</div>
       </AppLayout>
     )
-    expect(screen.getByText('Workflow Analytics')).toBeInTheDocument()
+    expect(screen.getAllByText('Deploy')[0]).toBeInTheDocument()
   })
 
   it('renders mobile hamburger menu button', () => {
@@ -212,7 +206,7 @@ describe('AppLayout', () => {
     const menuButtons = screen.getAllByRole('button')
     const hamburgerExists = menuButtons.some(btn => btn.querySelector('svg.lucide-menu') || btn.textContent === '')
     // Just verify the layout renders without error
-    expect(screen.getByText('OpenWorkflow Platform')).toBeInTheDocument()
+    expect(screen.getAllByText('Dashboard')[0]).toBeInTheDocument()
   })
 
   it('renders New Workflow button in header', () => {

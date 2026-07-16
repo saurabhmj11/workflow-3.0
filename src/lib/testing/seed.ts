@@ -21,13 +21,14 @@ export function seedDemoTestData(): void {
     assertions: [
       { type: 'status_equals', expected: 'success', message: 'Workflow should complete successfully' },
       { type: 'output_contains', expected: 'billing', message: 'Should classify as billing category' },
-      { type: 'confidence_greater_than', expected: 0.8, message: 'Classification confidence should be above 80%' },
+      { type: 'confidence_greater_than', nodeId: 'ai-1', expected: 0.8, message: 'Classification confidence should be above 80%' },
       { type: 'duration_less_than', expected: 5000, message: 'Should complete within 5 seconds' },
       { type: 'cost_less_than', expected: 0.01, message: 'Cost should be under $0.01' },
     ],
     mockConfig: {
       delayMs: 50,
       skipHumanNodes: true,
+      aiResponses: { llm: 'Classified as billing category.' },
     },
     tags: ['smoke', 'classification', 'billing'],
   })
@@ -45,7 +46,7 @@ export function seedDemoTestData(): void {
     assertions: [
       { type: 'status_equals', expected: 'success', message: 'Should complete successfully for enterprise leads' },
       { type: 'node_executed', nodeId: 'ai-1', message: 'AI classifier should run' },
-      { type: 'output_path_equals', path: 'response.confidence', expected: 0.92, message: 'Should have high confidence' },
+      { type: 'output_path_equals', path: 'confidence', expected: 0.92, message: 'Should have high confidence' },
     ],
     mockConfig: {
       delayMs: 30,

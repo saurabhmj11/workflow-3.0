@@ -436,61 +436,61 @@ export default function WorkflowBuilder() {
 
   return (
     <ErrorBoundary>
-    <div className="h-screen flex flex-col bg-[#F0F8FF] font-sans">
+    <div className="h-screen flex flex-col bg-zinc-950 font-sans">
       {/* Toolbar */}
-      <header className="border-b border-slate-200 bg-white px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-10">
+      <header className="border-b border-zinc-800 bg-zinc-900 px-4 py-3 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-md bg-primary flex items-center justify-center border border-white shadow-sm">
+          <div className="h-10 w-10 rounded-md bg-violet-600 flex items-center justify-center border border-violet-500/50">
             <Rocket className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold leading-tight text-slate-800 tracking-tight">Workflow Builder</h1>
-            <p className="text-sm text-slate-500 font-bold">{nodeCount} Blocks · {edgeCount} Connections</p>
+            <h1 className="text-2xl font-semibold leading-tight text-zinc-100 tracking-tight">Workflow Builder</h1>
+            <p className="text-sm text-zinc-500 font-medium">{nodeCount} Blocks · {edgeCount} Connections</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={undo} title="Undo">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={undo} title="Undo">
             <Undo2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={redo} title="Redo">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={redo} title="Redo">
             <Redo2 className="h-4 w-4" />
           </Button>
           
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-6 bg-zinc-700 mx-1" />
           
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={() => router.push('/demo')} title="AI Employee Demo">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => router.push('/demo')} title="AI Employee Demo">
             <Headphones className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={() => setGeneratorOpen(true)} title="AI Generate">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => setGeneratorOpen(true)} title="AI Generate">
             <Wand2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={() => setTemplateOpen(true)} title="Templates">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => setTemplateOpen(true)} title="Templates">
             <Lightbulb className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={handleAutoLayout} title="Tidy Up" disabled={storeNodes.length === 0}>
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={handleAutoLayout} title="Auto Layout" disabled={storeNodes.length === 0}>
             <LayoutGrid className="h-4 w-4" />
           </Button>
           
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-6 bg-zinc-700 mx-1" />
           
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={handleImport} title="Import">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={handleImport} title="Import">
             <Upload className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={handleExport} title="Export">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={handleExport} title="Export">
             <Download className="h-4 w-4" />
           </Button>
           
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-6 bg-zinc-700 mx-1" />
           
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900" onClick={handleSave} title="Save">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={handleSave} title="Save">
             <Save className="h-4 w-4" />
           </Button>
           <LoadWorkflowDialog />
           
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-6 bg-zinc-700 mx-1" />
           
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 hover:text-red-700" onClick={reset} title="Clear Everything">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-500 hover:text-red-400 hover:bg-zinc-800" onClick={reset} title="Clear canvas">
             <Trash2 className="h-4 w-4" />
           </Button>
           
@@ -517,8 +517,8 @@ export default function WorkflowBuilder() {
           </Button>
           
           {!hasTrigger && nodeCount > 0 && (
-            <Badge variant="outline" className="text-xs text-orange-600 bg-orange-50 border-orange-200">
-              Add a Trigger!
+            <Badge variant="outline" className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
+              Add a trigger node
             </Badge>
           )}
         </div>
@@ -534,28 +534,26 @@ export default function WorkflowBuilder() {
           {/* Empty state overlay */}
           {storeNodes.length === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="flex flex-col items-center gap-6 text-center pointer-events-auto max-w-lg bg-background p-10 rounded-xl shadow-sm border">
-                <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center border">
-                  <Star className="h-8 w-8 text-muted-foreground" />
+              <div className="flex flex-col items-center gap-5 text-center pointer-events-auto max-w-md bg-zinc-900/90 backdrop-blur-sm border border-zinc-800 p-10 rounded-2xl shadow-2xl">
+                <div className="h-14 w-14 rounded-xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center">
+                  <Workflow className="h-7 w-7 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
-                    Workflow Canvas
+                  <p className="text-xl font-semibold text-zinc-100">
+                    Start building your workflow
                   </p>
-                  <p className="text-muted-foreground mt-2">
-                    Drag and drop nodes from the palette to get started.
+                  <p className="text-sm text-zinc-500 mt-2 leading-relaxed">
+                    Drag nodes from the palette on the left, or start from a pre-built template.
                   </p>
                 </div>
-                <div className="flex flex-col items-center gap-4 w-full pt-4">
-                  <Button
-                    size="default"
-                    className="gap-2 w-full"
-                    onClick={() => setTemplateOpen(true)}
-                  >
-                    <Lightbulb className="h-4 w-4" />
-                    Browse Templates
-                  </Button>
-                </div>
+                <Button
+                  size="default"
+                  className="gap-2 w-full bg-violet-600 hover:bg-violet-500 text-white border-0"
+                  onClick={() => setTemplateOpen(true)}
+                >
+                  <Lightbulb className="h-4 w-4" />
+                  Browse Templates
+                </Button>
               </div>
             </div>
           )}
@@ -575,20 +573,20 @@ export default function WorkflowBuilder() {
             snapToGrid
             snapGrid={[16, 16]}
             defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
-            className="bg-blue-50/50"
+            className="bg-zinc-950"
           >
-            <Background variant={BackgroundVariant.Dots} gap={30} size={2} color="#cbd5e1" />
-            <Controls className="bg-white! border-slate-200! shadow-lg! rounded-xl! overflow-hidden! [&>button]:bg-white! [&>button]:border-slate-200! [&>button]:text-slate-600! [&>button:hover]:bg-slate-100! [&>button]:w-10 [&>button]:h-10" />
+            <Background variant={BackgroundVariant.Dots} gap={28} size={1.5} color="#3f3f46" />
+            <Controls className="[&>button]:bg-zinc-800! [&>button]:border-zinc-700! [&>button]:text-zinc-300! [&>button:hover]:bg-zinc-700! [&>button]:w-9 [&>button]:h-9 rounded-lg! overflow-hidden! border! border-zinc-700! shadow-xl!" />
             <MiniMap
               nodeColor={(n) => {
                 const cat = getCategoryForType(n.data?.nodeType as NodeType)
-                return cat.category === 'trigger' ? '#3b82f6' :
-                  cat.category === 'logic' ? '#10b981' :
+                return cat.category === 'trigger' ? '#7c3aed' :
+                  cat.category === 'logic' ? '#059669' :
                   cat.category === 'ai' ? '#8b5cf6' :
-                  cat.category === 'human' ? '#f59e0b' : '#06b6d4'
+                  cat.category === 'human' ? '#d97706' : '#0891b2'
               }}
-              className="bg-white! border! border-slate-200! rounded-lg! shadow-lg! overflow-hidden"
-              maskColor="rgba(240,248,255,0.7)"
+              className="bg-zinc-900! border! border-zinc-700! rounded-lg! shadow-xl! overflow-hidden"
+              maskColor="rgba(9,9,11,0.7)"
             />
           </ReactFlow>
 
@@ -620,7 +618,7 @@ export default function WorkflowBuilder() {
         </div>
 
         {/* Right panels */}
-        <div className="w-80 border-l border-slate-200 bg-white flex flex-col shadow-sm z-10">
+        <div className="w-80 border-l border-zinc-800 bg-zinc-900 flex flex-col z-10">
           {selectedNodeId ? (
             <NodeConfigPanel />
           ) : (
@@ -628,7 +626,7 @@ export default function WorkflowBuilder() {
               <div className="flex-1 overflow-hidden">
                 <ApprovalQueue />
               </div>
-              <div className="border-t border-slate-200 flex-1 overflow-hidden">
+              <div className="border-t border-zinc-800 flex-1 overflow-hidden">
                 <ExecutionReplay />
               </div>
             </>

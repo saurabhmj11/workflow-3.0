@@ -952,7 +952,7 @@ export function NodeConfigPanel() {
             </div>
           </ScrollArea>
           
-          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-violet-50 via-violet-50 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 p-3 bg-linear-to-t from-violet-50 via-violet-50 to-transparent">
             <form onSubmit={handleCopilotSubmit} className="relative">
               <Input
                 value={copilotInput}

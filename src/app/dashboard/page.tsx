@@ -35,19 +35,19 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { motion } from 'framer-motion'
+import { motion, Variants } from 'framer-motion'
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
+    transition: { staggerChildren: 0.05, duration: 0.3 }
   }
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 5 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } }
 }
 
 // ─── Colors ──────────────────────────────────────
@@ -148,31 +148,32 @@ function MetricCard({
   trendLabel?: string
   color?: string
 }) {
-  const colorMap: Record<string, string> = {
-    cyan: 'from-cyan-500/5 border-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.05)]',
-    emerald: 'from-emerald-500/5 border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]',
-    amber: 'from-amber-500/5 border-amber-500/20 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.05)]',
-    violet: 'from-violet-500/5 border-violet-500/20 text-violet-400 shadow-[0_0_15px_rgba(139,92,246,0.05)]',
-    red: 'from-red-500/5 border-red-500/20 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.05)]',
-    blue: 'from-blue-500/5 border-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.05)]',
+  const iconColorMap: Record<string, string> = {
+    cyan: 'text-zinc-400',
+    emerald: 'text-zinc-400',
+    amber: 'text-zinc-400',
+    violet: 'text-zinc-400',
+    red: 'text-zinc-400',
+    blue: 'text-zinc-400',
   }
-  const colorClass = colorMap[color] ?? colorMap.cyan
+  const iconClass = iconColorMap[color] ?? 'text-zinc-400'
 
   return (
     <motion.div variants={itemVariants} className="h-full">
-      <Card className={`h-full bg-zinc-900/40 backdrop-blur-md bg-linear-to-br ${colorClass.split(' ')[0]} to-transparent border ${colorClass.split(' ')[1]} ${colorClass.split(' ')[3]} hover:bg-zinc-900/60 transition-all duration-300`}>
+      <Card className="h-full bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-zinc-700/80 transition-colors">
         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-          <CardTitle className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{title}</CardTitle>
-          <Icon className={`h-4 w-4 ${colorClass.split(' ')[2]}`} />
+          <CardTitle className="text-xs font-medium text-zinc-400 tracking-wide">{title}</CardTitle>
+          <Icon className={`h-4 w-4 ${iconClass}`} />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-zinc-100">{value}</div>
+          <div className="text-2xl font-semibold text-zinc-100">{value}</div>
           {(subtitle || trendLabel) && (
-            <div className="flex items-center gap-1 mt-1">
-              {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-400" />}
-              {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-400" />}
+            <div className="flex items-center gap-1.5 mt-1.5">
+              {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-500" />}
+              {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-500" />}
+              {trend === 'neutral' && <Activity className="h-3 w-3 text-zinc-500" />}
               <span className={`text-xs ${
-                trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-500'
+                trend === 'up' ? 'text-emerald-500/90' : trend === 'down' ? 'text-red-500/90' : 'text-zinc-500'
               }`}>
                 {trendLabel || subtitle}
               </span>
@@ -218,43 +219,53 @@ export default function AIEmployeeDashboard() {
 
       // Process analytics
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) {
-        const json = await analyticsRes.value.json()
-        if (json.ok) {
-          setPlatformMetrics(json.data.platform)
-          setRealtimeMetrics(json.data.realtime)
-        }
+        try {
+          const json = await analyticsRes.value.json()
+          if (json.ok) {
+            setPlatformMetrics(json.data.platform)
+            setRealtimeMetrics(json.data.realtime)
+          }
+        } catch (e) { console.error('Failed to parse analytics JSON', e) }
       }
 
       // Process executions
       if (executionsRes.status === 'fulfilled' && executionsRes.value.ok) {
-        const json = await executionsRes.value.json()
-        if (json.ok && Array.isArray(json.data)) {
-          setExecutions(json.data)
-        }
+        try {
+          const json = await executionsRes.value.json()
+          if (json.ok && Array.isArray(json.data)) {
+            setExecutions(json.data)
+          }
+        } catch (e) { console.error('Failed to parse executions JSON', e) }
       }
 
       // Process approvals
       if (approvalsRes.status === 'fulfilled' && approvalsRes.value.ok) {
-        const json = await approvalsRes.value.json()
-        if (json.ok && Array.isArray(json.data)) {
-          setApprovals(json.data)
-        }
+        try {
+          const json = await approvalsRes.value.json()
+          if (json.ok && Array.isArray(json.data)) {
+            setApprovals(json.data)
+          }
+        } catch (e) { console.error('Failed to parse approvals JSON', e) }
       }
 
       // Process notifications
       if (notificationsRes.status === 'fulfilled' && notificationsRes.value.ok) {
-        const json = await notificationsRes.value.json()
-        if (json.ok && json.data) {
-          setNotifications(json.data.notifications ?? json.data ?? [])
-        }
+        try {
+          const json = await notificationsRes.value.json()
+          if (json.ok && json.data) {
+            setNotifications(json.data.notifications ?? json.data ?? [])
+          }
+        } catch (e) { console.error('Failed to parse notifications JSON', e) }
       }
 
       // Process workflows
       if (workflowsRes.status === 'fulfilled' && workflowsRes.value.ok) {
-        const json = await workflowsRes.value.json()
-        if (json.ok && Array.isArray(json.data)) {
-          setWorkflows(json.data)
-        }
+        try {
+          const json = await workflowsRes.value.json()
+          if (json.ok && Array.isArray(json.data)) {
+            setWorkflows(json.data)
+          }
+        } catch (e) { console.error('Failed to parse workflows JSON', e) }
       }
 
       setLastRefreshed(new Date())
@@ -335,9 +346,17 @@ export default function AIEmployeeDashboard() {
     }
   }, [])
 
-  // ─── Approval Actions ──────────────────────────
   const handleApproval = useCallback(async (approvalId: string, action: 'approved' | 'rejected') => {
     setActionLoading(prev => ({ ...prev, [approvalId]: true }))
+    const previousApprovals = [...approvals];
+    
+    // Optimistic UI update
+    setApprovals(prev => prev.map(a =>
+      a.id === approvalId
+        ? { ...a, status: action, resolvedAt: new Date().toISOString() }
+        : a
+    ))
+
     try {
       const res = await fetch('/api/approvals', {
         method: 'PUT',
@@ -345,19 +364,18 @@ export default function AIEmployeeDashboard() {
         body: JSON.stringify({ id: approvalId, status: action }),
       })
       const json = await res.json()
-      if (json.ok) {
-        setApprovals(prev => prev.map(a =>
-          a.id === approvalId
-            ? { ...a, status: action, resolvedAt: new Date().toISOString() }
-            : a
-        ))
+      if (!json.ok) {
+        throw new Error(json.error || 'Failed to update approval')
       }
-    } catch {
-      // Silently fail — UI already updated optimistically
+    } catch (err) {
+      // Revert optimistic update on failure
+      setApprovals(previousApprovals)
+      console.error('Failed to update approval:', err)
+      // Note: Ideally display a toast notification here
     } finally {
       setActionLoading(prev => ({ ...prev, [approvalId]: false }))
     }
-  }, [])
+  }, [approvals])
 
   // ─── Compute Metrics from Real Data ────────────
   const metrics = useMemo(() => {
@@ -580,29 +598,29 @@ export default function AIEmployeeDashboard() {
         {/* Real-time Metrics Row */}
         {realtimeMetrics && (
           <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
+            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
               <div className={`h-2 w-2 rounded-full ${realtimeMetrics.activeExecutions > 0 ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`} />
               <div>
                 <p className="text-xs text-zinc-500">Active Now</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.activeExecutions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
+              <CheckCircle2 className="h-4 w-4 text-zinc-400" />
               <div>
                 <p className="text-xs text-zinc-500">Completed (1h)</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentCompletions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
-              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
+              <AlertTriangle className="h-4 w-4 text-zinc-400" />
               <div>
                 <p className="text-xs text-zinc-500">Errors (5m)</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentErrors}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900/40 backdrop-blur-md border border-zinc-800/50 shadow-sm hover:border-zinc-700 transition-colors">
-              <Clock className="h-3.5 w-3.5 text-cyan-500" />
+            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
+              <Clock className="h-4 w-4 text-zinc-400" />
               <div>
                 <p className="text-xs text-zinc-500">Avg Response</p>
                 <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.avgResponseTime > 0 ? `${(realtimeMetrics.avgResponseTime / 1000).toFixed(1)}s` : '—'}</p>
@@ -759,7 +777,7 @@ export default function AIEmployeeDashboard() {
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Status Distribution */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-cyan-400" />
@@ -799,7 +817,7 @@ export default function AIEmployeeDashboard() {
               </Card>
 
               {/* Node Type Breakdown or Trigger Types */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Zap className="h-4 w-4 text-violet-400" />
@@ -831,7 +849,7 @@ export default function AIEmployeeDashboard() {
 
             {/* Top Workflows */}
             {metrics.topWorkflows.length > 0 && (
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Workflow className="h-4 w-4 text-emerald-400" />
@@ -865,7 +883,7 @@ export default function AIEmployeeDashboard() {
           <TabsContent value="cost" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Cost Over Time */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-emerald-400" />
@@ -896,7 +914,7 @@ export default function AIEmployeeDashboard() {
               </Card>
 
               {/* Duration Over Time */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-blue-400" />
@@ -929,7 +947,7 @@ export default function AIEmployeeDashboard() {
 
             {/* Error Trend */}
             {metrics.errorTrendData.length > 0 && (
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-400" />
@@ -955,7 +973,7 @@ export default function AIEmployeeDashboard() {
 
             {/* Token Usage */}
             {metrics.totalTokensUsed > 0 && (
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Brain className="h-5 w-5 text-violet-400" />
@@ -973,7 +991,7 @@ export default function AIEmployeeDashboard() {
           <TabsContent value="confidence" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Confidence Distribution */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Target className="h-4 w-4 text-cyan-400" />
@@ -1013,7 +1031,7 @@ export default function AIEmployeeDashboard() {
               </Card>
 
               {/* Confidence Threshold Guide */}
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Brain className="h-4 w-4 text-violet-400" />
@@ -1060,7 +1078,7 @@ export default function AIEmployeeDashboard() {
 
           <TabsContent value="activity" className="space-y-4">
             {/* Recent Executions from DB */}
-            <Card className="bg-zinc-900/80 border-zinc-800">
+            <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                   <Activity className="h-4 w-4 text-cyan-400" />
@@ -1126,7 +1144,7 @@ export default function AIEmployeeDashboard() {
 
             {/* Recent Notifications */}
             {unreadNotifications.length > 0 && (
-              <Card className="bg-zinc-900/80 border-zinc-800">
+              <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
                     <Bell className="h-4 w-4 text-amber-400" />
@@ -1161,7 +1179,7 @@ export default function AIEmployeeDashboard() {
         {/* Bottom Section: Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Link href="/build">
-            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-cyan-500/30 transition-colors cursor-pointer">
+            <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-cyan-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-cyan-400" />
@@ -1174,7 +1192,7 @@ export default function AIEmployeeDashboard() {
             </Card>
           </Link>
           <Link href="/build?ai=true">
-            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-violet-500/30 transition-colors cursor-pointer">
+            <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-violet-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                   <Brain className="h-5 w-5 text-violet-400" />
@@ -1187,7 +1205,7 @@ export default function AIEmployeeDashboard() {
             </Card>
           </Link>
           <Link href="/audit">
-            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-amber-500/30 transition-colors cursor-pointer">
+            <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-amber-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                   <AlertTriangle className="h-5 w-5 text-amber-400" />
@@ -1200,7 +1218,7 @@ export default function AIEmployeeDashboard() {
             </Card>
           </Link>
           <Link href="/analytics">
-            <Card className="bg-zinc-900/80 border-zinc-800 hover:border-emerald-500/30 transition-colors cursor-pointer">
+            <Card className="bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-emerald-500/30 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                   <BarChart3 className="h-5 w-5 text-emerald-400" />

@@ -10,7 +10,7 @@ export default auth((req) => {
   
   // Public routes that don't require authentication
   const isPublicRoute = 
-    nextUrl.pathname === '/' || 
+    nextUrl.pathname === '/' ||
     nextUrl.pathname.startsWith('/demo') || 
     nextUrl.pathname.startsWith('/widget') ||
     nextUrl.pathname.startsWith('/embed')
@@ -33,8 +33,8 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  // If logged in and visiting the landing page, go straight to dashboard
-  if (isLoggedIn && nextUrl.pathname === '/') {
+  // Redirect root to dashboard if logged in
+  if (nextUrl.pathname === '/' && isLoggedIn) {
     return NextResponse.redirect(new URL('/dashboard', nextUrl))
   }
 

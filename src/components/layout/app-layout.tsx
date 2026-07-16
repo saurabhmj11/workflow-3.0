@@ -41,7 +41,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   // If excluded, just render children without layout
   if (isExcluded) {
-    return <>{children}</>
+    return (
+      <>
+        {children}
+        <footer className="fixed bottom-0 w-full py-3 text-center text-xs text-zinc-500 pointer-events-none z-50">
+          copy right design and dedvelop by saurabh lokhande
+        </footer>
+      </>
+    )
   }
 
   // Get page metadata for the header
@@ -102,8 +109,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
+        <div className="flex-1 overflow-y-auto flex flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <footer className="py-4 text-center text-xs text-zinc-500 border-t border-zinc-800/50 mt-auto shrink-0">
+            copy right design and dedvelop by saurabh lokhande
+          </footer>
         </div>
       </main>
 

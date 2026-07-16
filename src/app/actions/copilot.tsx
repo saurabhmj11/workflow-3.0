@@ -20,7 +20,7 @@ export async function askCopilot(
     tools: {
       suggestConfig: {
         description: 'Suggest a new configuration for the node',
-        parameters: z.object({
+        inputSchema: z.object({
           explanation: z.string().describe('Explanation of the suggested changes'),
           config: z.record(z.string(), z.any()).describe('The suggested configuration object (key-value pairs)'),
         }),

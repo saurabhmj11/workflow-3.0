@@ -1166,22 +1166,22 @@ function SettingsContent() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="profile">
+          <TabsContent value="profile" forceMount className="data-[state=inactive]:hidden">
             <ProfileTab />
           </TabsContent>
-          <TabsContent value="organization">
+          <TabsContent value="organization" forceMount className="data-[state=inactive]:hidden">
             <OrganizationTab />
           </TabsContent>
-          <TabsContent value="notifications">
+          <TabsContent value="notifications" forceMount className="data-[state=inactive]:hidden">
             <NotificationsTab />
           </TabsContent>
-          <TabsContent value="security">
+          <TabsContent value="security" forceMount className="data-[state=inactive]:hidden">
             <SecurityTab />
           </TabsContent>
-          <TabsContent value="api-keys">
+          <TabsContent value="api-keys" forceMount className="data-[state=inactive]:hidden">
             <ApiKeysTab />
           </TabsContent>
-          <TabsContent value="whitelabel">
+          <TabsContent value="whitelabel" forceMount className="data-[state=inactive]:hidden">
             <WhitelabelTab />
           </TabsContent>
         </Tabs>

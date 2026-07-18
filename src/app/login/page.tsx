@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react"
 import { signIn } from "next-auth/react"
+import { AuthError } from "next-auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,19 +32,40 @@ function LoginForm() {
 
     try {
       const result = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
       })
 
+      // NextAuth v4 / some v5 paths return a result object
       if (result?.error) {
-        setErrorMessage("Invalid email or password")
-      } else {
-        router.push(callbackUrl)
-        router.refresh()
+        if (result.error === "CredentialsSignin") {
+          setErrorMessage("Invalid email or password")
+        } else {
+          setErrorMessage("Sign in failed. Please try again.")
+        }
+        return
       }
-    } catch {
-      setErrorMessage("An unexpected error occurred")
+
+      router.push(callbackUrl)
+      router.refresh()
+    } catch (error) {
+      // NextAuth v5 throws AuthError instead of returning { error } in some paths
+      if (error instanceof AuthError) {
+        switch (error.type) {
+          case "CredentialsSignin":
+            setErrorMessage("Invalid email or password")
+            break
+          case "AccessDenied":
+            setErrorMessage("Access denied. Please contact support.")
+            break
+          default:
+            setErrorMessage("Sign in failed. Please try again.")
+        }
+      } else {
+        // Network error or other unexpected failure
+        setErrorMessage("Unable to connect. Please check your connection and try again.")
+      }
     } finally {
       setIsLoading(false)
     }

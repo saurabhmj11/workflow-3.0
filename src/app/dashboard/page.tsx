@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -187,6 +189,29 @@ function MetricCard({
 
 // ─── Main Dashboard Page ─────────────────────────
 export default function AIEmployeeDashboard() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  // ─── Auth Guard ─────────────────────────────────
+  // Redirect to login if not authenticated (client-side, middleware is passthrough)
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login')
+    }
+  }, [status, router])
+
+  // Show loading while checking session
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
+          <p className="text-sm text-zinc-400">{status === 'unauthenticated' ? 'Redirecting to login...' : 'Loading Dashboard...'}</p>
+        </div>
+      </div>
+    )
+  }
+
   // ─── API Data State ────────────────────────────
   const [platformMetrics, setPlatformMetrics] = useState<PlatformMetrics | null>(null)
   const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null)

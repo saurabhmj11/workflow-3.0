@@ -15,7 +15,7 @@ import Link from "next/link"
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/"
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
   const error = searchParams.get("error")
 
   const [email, setEmail] = useState("")
@@ -47,7 +47,10 @@ function LoginForm() {
         return
       }
 
-      router.push(callbackUrl)
+      // Always navigate to dashboard after successful login
+      // Avoid redirecting to "/" which can trigger middleware loops
+      const destination = callbackUrl.startsWith("/") && callbackUrl !== "/" ? callbackUrl : "/dashboard"
+      router.push(destination)
       router.refresh()
     } catch (error) {
       // NextAuth v5 throws AuthError instead of returning { error } in some paths

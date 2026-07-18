@@ -65,7 +65,7 @@ export default function RegisterPage() {
       })
 
       if (result?.ok) {
-        router.push("/")
+        router.push("/dashboard")
         router.refresh()
       } else {
         // If auto sign-in fails, redirect to login

@@ -1,45 +1,21 @@
 import type { NextAuthConfig } from "next-auth"
 
-// This config is safe for the Edge runtime (no Prisma or Node.js modules)
+// This config is safe for the Edge runtime (no Prisma or Node.js modules).
+// NOTE: Middleware is now a passthrough — auth is enforced by the app router layouts
+// and API routes directly. This config only governs callbacks/pages for NextAuth itself.
 export const authConfig = {
   pages: {
     signIn: "/login",
     newUser: "/register",
+    error: "/login",
   },
   providers: [], // Configured in auth.ts
   callbacks: {
+    // Used by middleware (NextAuth(authConfig).auth) - currently passthrough
     authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
-      const isAuthRoute =
-        nextUrl.pathname.startsWith("/login") ||
-        nextUrl.pathname.startsWith("/register") ||
-        nextUrl.pathname.startsWith("/api/sso")
-        
-      const isPublicRoute =
-        nextUrl.pathname === "/" ||
-        nextUrl.pathname.startsWith("/demo") ||
-        nextUrl.pathname.startsWith("/widget") ||
-        nextUrl.pathname.startsWith("/embed") ||
-        nextUrl.pathname.startsWith("/api/public") ||
-        nextUrl.pathname.startsWith("/api/auth")
-
-      if (isAuthRoute) {
-        if (isLoggedIn) {
-          return Response.redirect(new URL("/dashboard", nextUrl))
-        }
-        return true
-      }
-
-      if (nextUrl.pathname === "/" && isLoggedIn) {
-        return Response.redirect(new URL("/dashboard", nextUrl))
-      }
-
-      if (!isLoggedIn && !isPublicRoute) {
-        return false // Redirects to login page
-      }
+      // Allow everything through - app layers handle auth enforcement
       return true
     },
-    // We need these here so Edge JWT token decoding preserves shape
     async jwt({ token, user }) {
       if (user && user.id) {
         token.userId = user.id
@@ -51,9 +27,9 @@ export const authConfig = {
     async session({ session, token }) {
       if (token) {
         // @ts-ignore
-        session.user.id = token.userId
+        session.user.id = token.userId as string
         // @ts-ignore
-        session.user.role = token.role
+        session.user.role = token.role as string
       }
       return session
     },

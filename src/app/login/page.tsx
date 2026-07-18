@@ -25,6 +25,28 @@ function LoginForm() {
     error === "CredentialsSignin" ? "Invalid email or password" : error ? "An error occurred during sign in" : ""
   )
 
+  const handleDemoLogin = async () => {
+    setIsLoading(true)
+    setErrorMessage("")
+    try {
+      const result = await signIn("credentials", {
+        email: "demo@openworkflow.ai",
+        password: "demo123",
+        redirect: false,
+      })
+      if (result?.error) {
+        setErrorMessage("Demo login failed: " + result.error)
+        return
+      }
+      router.push("/dashboard")
+      router.refresh()
+    } catch {
+      setErrorMessage("Demo login failed. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -200,7 +222,24 @@ function LoginForm() {
               "Sign in"
             )}
           </Button>
+
+          {/* Demo Login */}
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={isLoading}
+            className="w-full h-10 rounded-lg border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {isLoading ? "Loading..." : "⚡ Try Demo Account"}
+          </button>
         </form>
+
+        {/* Demo credentials box */}
+        <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+          <p className="text-xs text-cyan-400 font-medium mb-1">Demo Credentials</p>
+          <p className="text-xs text-zinc-400">Email: <span className="text-zinc-200 font-mono">demo@openworkflow.ai</span></p>
+          <p className="text-xs text-zinc-400">Password: <span className="text-zinc-200 font-mono">demo123</span></p>
+        </div>
       </CardContent>
 
       <CardFooter className="flex flex-col gap-3 pb-6">

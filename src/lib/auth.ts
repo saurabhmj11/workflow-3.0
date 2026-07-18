@@ -4,9 +4,7 @@ import GitHub from "next-auth/providers/github"
 import Google from "next-auth/providers/google"
 import { db } from "@/lib/db"
 
-// ─── Password verification using Web Crypto API ──────
-// Compatible with both edge runtime and Node.js
-
+// ─── Password verification ────────────────────────────────────────────────────
 async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   if (!storedHash.startsWith("sha256:")) {
     // Legacy bcrypt hash — try bcryptjs
@@ -17,7 +15,10 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
       return false
     }
   }
-  const [, salt, hash] = storedHash.split(":")
+  // sha256:<salt>:<hash> format
+  const parts = storedHash.split(":")
+  if (parts.length !== 3) return false
+  const [, salt, hash] = parts
   const encoder = new TextEncoder()
   const data = encoder.encode(password + salt)
   const hashBuffer = await crypto.subtle.digest("SHA-256", data)
@@ -26,11 +27,27 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
   return hash === hashHex
 }
 
-// ─── NextAuth.js v5 Configuration ───────────────────
-// OpenWorkflow authentication with Credentials, GitHub, and Google providers
-// Uses JWT session strategy for stateless auth
-
+// ─── NextAuth v5 Configuration ───────────────────────────────────────────────
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Pages
+  pages: {
+    signIn: "/login",
+    newUser: "/register",
+    error: "/login",
+  },
+
+  // Session strategy
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+
+  // Required for production (Netlify)
+  trustHost: true,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  debug: false,
+
+  // Providers
   providers: [
     Credentials({
       name: "credentials",
@@ -43,119 +60,118 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
-        const user = await db.user.findUnique({
-          where: { email: (credentials.email as string).trim().toLowerCase() },
-        })
+        const email = (credentials.email as string).trim().toLowerCase()
+        const password = credentials.password as string
 
-        if (!user || !user.hashedPassword) {
-          return null
+        // ── Demo account (always available, no DB needed) ──
+        if (email === "demo@openworkflow.ai" && password === "demo123") {
+          return {
+            id: "demo-user-id",
+            email: "demo@openworkflow.ai",
+            name: "Demo User",
+            image: null,
+            role: "USER",
+          }
         }
 
-        const isValid = await verifyPassword(
-          credentials.password as string,
-          user.hashedPassword
-        )
+        // ── Database lookup ────────────────────────────────
+        try {
+          const user = await db.user.findUnique({
+            where: { email },
+          })
 
-        if (!isValid) {
+          if (!user || !user.hashedPassword) {
+            return null
+          }
+
+          const isValid = await verifyPassword(password, user.hashedPassword)
+
+          if (!isValid) {
+            return null
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role,
+          }
+        } catch (err) {
+          console.error("[authorize] DB error:", err)
           return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
         }
       },
     }),
+
     // GitHub OAuth — only enabled if env vars are set
     ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
-      ? [
-          GitHub({
-            clientId: process.env.GITHUB_ID,
-            clientSecret: process.env.GITHUB_SECRET,
-          }),
-        ]
+      ? [GitHub({ clientId: process.env.GITHUB_ID, clientSecret: process.env.GITHUB_SECRET })]
       : []),
+
     // Google OAuth — only enabled if env vars are set
     ...(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET
-      ? [
-          Google({
-            clientId: process.env.GOOGLE_ID,
-            clientSecret: process.env.GOOGLE_SECRET,
-          }),
-        ]
+      ? [Google({ clientId: process.env.GOOGLE_ID, clientSecret: process.env.GOOGLE_SECRET })]
       : []),
   ],
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  pages: {
-    signIn: "/login",
-    newUser: "/register",
-  },
+
+  // Callbacks — defined ONCE, no spreads
   callbacks: {
+    // JWT callback: embed user data into the token on sign-in
     async jwt({ token, user }) {
-      // Initial sign in — add user info to token
-      if (user && user.id) {
-        token.userId = user.id
-        token.role = (user as { role?: string }).role ?? "USER"
+      if (user) {
+        token.userId = user.id ?? ""
+        token.role = (user as any).role ?? "USER"
+        token.email = user.email ?? ""
+        token.name = user.name ?? ""
       }
       return token
     },
+
+    // Session callback: expose token data to useSession()
     async session({ session, token }) {
-      // Forward token data to session
-      if (token) {
+      if (token && session.user) {
         session.user.id = token.userId as string
         session.user.role = token.role as string
+        session.user.email = token.email as string
+        session.user.name = token.name as string
       }
       return session
     },
+
+    // signIn callback: create OAuth users in DB
     async signIn({ user, account }) {
-      // For OAuth providers, create user in DB if they don't exist
       if (account?.provider === "github" || account?.provider === "google") {
         if (!user.email) return false
-
-        const existingUser = await db.user.findUnique({
-          where: { email: user.email },
-        })
-
-        if (!existingUser) {
-          await db.user.create({
-            data: {
-              email: user.email,
-              name: user.name ?? null,
-              image: user.image ?? null,
-              role: "USER",
-            },
-          })
+        try {
+          const existing = await db.user.findUnique({ where: { email: user.email } })
+          if (!existing) {
+            await db.user.create({
+              data: {
+                email: user.email,
+                name: user.name ?? null,
+                image: user.image ?? null,
+                role: "USER",
+              },
+            })
+          }
+        } catch {
+          // Don't block OAuth sign-in on DB errors
         }
       }
       return true
     },
+
+    // Redirect: always go to dashboard after login
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) {
-        if (url === '/') return `${baseUrl}/dashboard`
-        return `${baseUrl}${url}`
-      }
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) {
-        if (url === baseUrl || url === `${baseUrl}/`) return `${baseUrl}/dashboard`
-        return url
-      }
-      // Fallback
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      if (new URL(url).origin === baseUrl) return url
       return `${baseUrl}/dashboard`
     },
   },
-  trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development",
 })
 
-// Type augmentation for NextAuth v5
+// ─── Type Augmentation ────────────────────────────────────────────────────────
 declare module "next-auth" {
   interface Session {
     user: {
@@ -166,7 +182,6 @@ declare module "next-auth" {
       role: string
     }
   }
-
   interface User {
     role?: string
   }

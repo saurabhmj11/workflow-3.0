@@ -6,9 +6,8 @@
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
-  NEXT_PRIVATE_LOCAL_WEBPACK = "true"
 
 # Security headers
 [[headers]]

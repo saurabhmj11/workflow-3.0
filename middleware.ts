@@ -18,11 +18,17 @@ export async function middleware(request: NextRequest) {
   if (nextUrl.pathname.startsWith("/api/public")) return NextResponse.next()
 
   // ── Validate session JWT ─────────────────────────────────────────────
+  // Dynamically determine secure cookie usage by checking what was actually set
+  const isSecure = 
+    request.cookies.has("__Secure-authjs.session-token") || 
+    request.cookies.has("__Secure-next-auth.session-token")
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-    // In Next.js 15+ on HTTPS the cookie is __Secure-authjs.session-token
-    secureCookie: process.env.NODE_ENV === "production",
+    secureCookie: isSecure,
+    // NextAuth v5 uses authjs.session-token by default
+    salt: isSecure ? "__Secure-authjs.session-token" : "authjs.session-token"
   })
 
   const isLoggedIn = !!token

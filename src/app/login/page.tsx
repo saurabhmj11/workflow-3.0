@@ -87,39 +87,47 @@ function LoginForm() {
           </div>
         )}
 
-        {/* OAuth Buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            className="h-11 bg-zinc-800/50 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600"
-            onClick={() => handleOAuthSignIn("github")}
-            disabled={isLoading}
-            type="button"
-          >
-            <Github className="h-4 w-4 mr-2" />
-            GitHub
-          </Button>
-          <Button
-            variant="outline"
-            className="h-11 bg-zinc-800/50 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600"
-            onClick={() => handleOAuthSignIn("google")}
-            disabled={isLoading}
-            type="button"
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            Google
-          </Button>
-        </div>
+        {/* OAuth Buttons — only shown when providers are configured */}
+        {(process.env.NEXT_PUBLIC_GITHUB_ENABLED === "true" || process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true") && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {process.env.NEXT_PUBLIC_GITHUB_ENABLED === "true" && (
+                <Button
+                  variant="outline"
+                  className="h-11 bg-zinc-800/50 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600"
+                  onClick={() => handleOAuthSignIn("github")}
+                  disabled={isLoading}
+                  type="button"
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  GitHub
+                </Button>
+              )}
+              {process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && (
+                <Button
+                  variant="outline"
+                  className="h-11 bg-zinc-800/50 border-zinc-700 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 hover:border-zinc-600"
+                  onClick={() => handleOAuthSignIn("google")}
+                  disabled={isLoading}
+                  type="button"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Google
+                </Button>
+              )}
+            </div>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-zinc-800" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-zinc-900 px-2 text-zinc-500">or continue with email</span>
-          </div>
-        </div>
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-zinc-800" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-zinc-900 px-2 text-zinc-500">or continue with email</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Credentials Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -180,9 +188,7 @@ function LoginForm() {
             Create one
           </Link>
         </p>
-        <p className="text-xs text-zinc-600">
-          Demo: admin@openworkflow.ai / admin123
-        </p>
+
       </CardFooter>
     </Card>
   )

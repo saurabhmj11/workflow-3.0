@@ -23,21 +23,22 @@ export const metadata: Metadata = {
   },
 };
 
-import { auth } from "@/lib/auth";
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  // NOTE: Do NOT call auth() here — it returns null on Netlify's serverless edge
+  // because the JWT secret mismatch in the Edge runtime. Instead, SessionProvider
+  // will fetch the session client-side from /api/auth/session which works correctly.
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <SessionProvider session={session}>
+        <SessionProvider>
           <AppLayout>
             {children}
           </AppLayout>

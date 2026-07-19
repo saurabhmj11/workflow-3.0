@@ -164,8 +164,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     // Redirect: always go to dashboard after login
     async redirect({ url, baseUrl }) {
+      if (url === "/" || url === baseUrl || url === `${baseUrl}/`) {
+        return `${baseUrl}/dashboard`
+      }
       if (url.startsWith("/")) return `${baseUrl}${url}`
-      if (new URL(url).origin === baseUrl) return url
+      try {
+        if (new URL(url).origin === baseUrl) return url
+      } catch {
+        // Ignore invalid URLs
+      }
       return `${baseUrl}/dashboard`
     },
   },

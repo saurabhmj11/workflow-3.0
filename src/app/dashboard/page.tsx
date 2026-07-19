@@ -150,32 +150,52 @@ function MetricCard({
   trendLabel?: string
   color?: string
 }) {
-  const iconColorMap: Record<string, string> = {
-    cyan: 'text-zinc-400',
-    emerald: 'text-zinc-400',
-    amber: 'text-zinc-400',
-    violet: 'text-zinc-400',
-    red: 'text-zinc-400',
-    blue: 'text-zinc-400',
+  const colorGradients: Record<string, string> = {
+    cyan: 'from-cyan-500/20 to-cyan-500/0 border-cyan-500/20 group-hover:border-cyan-500/50',
+    emerald: 'from-emerald-500/20 to-emerald-500/0 border-emerald-500/20 group-hover:border-emerald-500/50',
+    amber: 'from-amber-500/20 to-amber-500/0 border-amber-500/20 group-hover:border-amber-500/50',
+    violet: 'from-violet-500/20 to-violet-500/0 border-violet-500/20 group-hover:border-violet-500/50',
+    red: 'from-red-500/20 to-red-500/0 border-red-500/20 group-hover:border-red-500/50',
+    blue: 'from-blue-500/20 to-blue-500/0 border-blue-500/20 group-hover:border-blue-500/50',
   }
-  const iconClass = iconColorMap[color] ?? 'text-zinc-400'
+  
+  const iconColors: Record<string, string> = {
+    cyan: 'text-cyan-400 bg-cyan-400/10',
+    emerald: 'text-emerald-400 bg-emerald-400/10',
+    amber: 'text-amber-400 bg-amber-400/10',
+    violet: 'text-violet-400 bg-violet-400/10',
+    red: 'text-red-400 bg-red-400/10',
+    blue: 'text-blue-400 bg-blue-400/10',
+  }
+
+  const gradientClass = colorGradients[color] ?? colorGradients.cyan
+  const iconClass = iconColors[color] ?? iconColors.cyan
 
   return (
-    <motion.div variants={itemVariants} className="h-full">
-      <Card className="h-full bg-zinc-950/50 border-zinc-800/80 shadow-none hover:border-zinc-700/80 transition-colors">
-        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-          <CardTitle className="text-xs font-medium text-zinc-400 tracking-wide">{title}</CardTitle>
-          <Icon className={`h-4 w-4 ${iconClass}`} />
+    <motion.div variants={itemVariants} className="h-full relative group">
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradientClass} rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+      <Card className={`h-full bg-zinc-950/60 backdrop-blur-xl border-zinc-800/60 shadow-2xl relative overflow-hidden transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]`}>
+        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradientClass} opacity-10 blur-3xl rounded-full transform translate-x-1/2 -translate-y-1/2`} />
+        
+        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
+          <CardTitle className="text-sm font-medium text-zinc-400 tracking-wide">{title}</CardTitle>
+          <div className={`p-2 rounded-lg ${iconClass} shadow-inner`}>
+            <Icon className="h-4 w-4" />
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-semibold text-zinc-100">{value}</div>
+        <CardContent className="relative z-10 pt-2">
+          <div className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">{value}</div>
           {(subtitle || trendLabel) && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-500" />}
-              {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-500" />}
-              {trend === 'neutral' && <Activity className="h-3 w-3 text-zinc-500" />}
-              <span className={`text-xs ${
-                trend === 'up' ? 'text-emerald-500/90' : trend === 'down' ? 'text-red-500/90' : 'text-zinc-500'
+            <div className="flex items-center gap-2 mt-3">
+              <div className={`flex items-center justify-center rounded-full p-1 ${
+                trend === 'up' ? 'bg-emerald-500/15' : trend === 'down' ? 'bg-red-500/15' : 'bg-zinc-500/15'
+              }`}>
+                {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-400" />}
+                {trend === 'down' && <ArrowDownRight className="h-3 w-3 text-red-400" />}
+                {trend === 'neutral' && <Activity className="h-3 w-3 text-zinc-400" />}
+              </div>
+              <span className={`text-xs font-medium ${
+                trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-400'
               }`}>
                 {trendLabel || subtitle}
               </span>
@@ -189,7 +209,7 @@ function MetricCard({
 
 // ─── Main Dashboard Page ─────────────────────────
 export default function AIEmployeeDashboard() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const router = useRouter()
 
   // ─── Auth Guard ─────────────────────────────────
@@ -212,6 +232,10 @@ export default function AIEmployeeDashboard() {
     )
   }
 
+  return <DashboardContent />
+}
+
+function DashboardContent() {
   // ─── API Data State ────────────────────────────
   const [platformMetrics, setPlatformMetrics] = useState<PlatformMetrics | null>(null)
   const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null)
@@ -571,84 +595,101 @@ export default function AIEmployeeDashboard() {
 
   return (
     <motion.div 
-      className="max-w-7xl mx-auto px-6 py-6 space-y-6"
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
         {/* Header with live status & refresh */}
-        <motion.div variants={itemVariants} className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-100">AI Employee Dashboard</h1>
-            <p className="text-xs text-zinc-500">
-              {lastRefreshed
-                ? `Last updated ${lastRefreshed.toLocaleTimeString()}`
-                : 'Real-time performance metrics'}
-            </p>
+        <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+          <div className="space-y-1.5">
+            <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-400 tracking-tight">
+              Command Center
+            </h1>
+            <div className="flex items-center gap-3 text-sm text-zinc-500">
+              <p>
+                {lastRefreshed
+                  ? `Last updated ${lastRefreshed.toLocaleTimeString()}`
+                  : 'Real-time performance metrics'}
+              </p>
+              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              <div className="flex items-center gap-1.5 font-medium">
+                {isLiveConnected ? (
+                  <><Wifi className="h-3.5 w-3.5 text-emerald-400" /><span className="text-emerald-400">Live stream active</span></>
+                ) : (
+                  <><WifiOff className="h-3.5 w-3.5 text-zinc-600" /><span className="text-zinc-600">Offline</span></>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs">
-              {isLiveConnected ? (
-                <><Wifi className="h-3.5 w-3.5 text-emerald-400" /><span className="text-emerald-400">Live</span></>
-              ) : (
-                <><WifiOff className="h-3.5 w-3.5 text-zinc-600" /><span className="text-zinc-600">Offline</span></>
-              )}
-            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => fetchAllData(true)}
               disabled={isRefreshing}
-              className="h-8 text-xs border-zinc-800 hover:bg-zinc-800 shadow-[0_0_10px_rgba(255,255,255,0.05)] transition-all hover:scale-105 active:scale-95"
+              className="h-10 px-5 text-sm font-medium bg-zinc-900/80 border-zinc-700/50 text-zinc-300 hover:text-white hover:bg-zinc-800 shadow-[0_0_15px_rgba(255,255,255,0.02)] transition-all hover:scale-105 active:scale-95 rounded-full"
             >
-              <RefreshCw className={`h-3 w-3 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+              Sync Data
             </Button>
           </div>
         </motion.div>
 
         {/* Error Banner */}
         {fetchError && (
-          <Card className="bg-red-950/30 border-red-500/30">
-            <CardContent className="p-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <p className="text-xs text-red-300">{fetchError}</p>
-              <Button variant="outline" size="sm" onClick={() => fetchAllData(true)} className="ml-auto h-6 text-[10px] border-red-500/30 text-red-300 hover:bg-red-950/50">
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
+          <motion.div variants={itemVariants}>
+            <Card className="bg-red-950/40 border-red-500/30 backdrop-blur-sm">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="p-2 bg-red-500/10 rounded-full">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <p className="text-sm font-medium text-red-300">{fetchError}</p>
+                <Button variant="outline" size="sm" onClick={() => fetchAllData(true)} className="ml-auto h-8 text-xs border-red-500/30 text-red-300 hover:bg-red-900/60 rounded-full px-4">
+                  Retry Connection
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {/* Real-time Metrics Row */}
         {realtimeMetrics && (
-          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
-              <div className={`h-2 w-2 rounded-full ${realtimeMetrics.activeExecutions > 0 ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`} />
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="group flex items-center gap-4 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 hover:bg-zinc-800/40 transition-colors backdrop-blur-md">
+              <div className="p-2.5 bg-blue-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                <div className={`h-2.5 w-2.5 rounded-full ${realtimeMetrics.activeExecutions > 0 ? 'bg-blue-400 animate-pulse shadow-[0_0_10px_rgba(96,165,250,0.6)]' : 'bg-zinc-600'}`} />
+              </div>
               <div>
-                <p className="text-xs text-zinc-500">Active Now</p>
-                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.activeExecutions}</p>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Active Now</p>
+                <p className="text-xl font-bold text-zinc-100">{realtimeMetrics.activeExecutions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
-              <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+            <div className="group flex items-center gap-4 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 hover:bg-zinc-800/40 transition-colors backdrop-blur-md">
+              <div className="p-2.5 bg-emerald-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              </div>
               <div>
-                <p className="text-xs text-zinc-500">Completed (1h)</p>
-                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentCompletions}</p>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Completed (1h)</p>
+                <p className="text-xl font-bold text-zinc-100">{realtimeMetrics.recentCompletions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
-              <AlertTriangle className="h-4 w-4 text-zinc-400" />
+            <div className="group flex items-center gap-4 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 hover:bg-zinc-800/40 transition-colors backdrop-blur-md">
+              <div className="p-2.5 bg-amber-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              </div>
               <div>
-                <p className="text-xs text-zinc-500">Errors (5m)</p>
-                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.recentErrors}</p>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Errors (5m)</p>
+                <p className="text-xl font-bold text-zinc-100">{realtimeMetrics.recentErrors}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-md bg-zinc-950/50 border border-zinc-800/80 shadow-none">
-              <Clock className="h-4 w-4 text-zinc-400" />
+            <div className="group flex items-center gap-4 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 hover:bg-zinc-800/40 transition-colors backdrop-blur-md">
+              <div className="p-2.5 bg-violet-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                <Clock className="h-5 w-5 text-violet-400" />
+              </div>
               <div>
-                <p className="text-xs text-zinc-500">Avg Response</p>
-                <p className="text-sm font-semibold text-zinc-200">{realtimeMetrics.avgResponseTime > 0 ? `${(realtimeMetrics.avgResponseTime / 1000).toFixed(1)}s` : '—'}</p>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Avg Response</p>
+                <p className="text-xl font-bold text-zinc-100">{realtimeMetrics.avgResponseTime > 0 ? `${(realtimeMetrics.avgResponseTime / 1000).toFixed(1)}s` : '—'}</p>
               </div>
             </div>
           </motion.div>

@@ -1,7 +1,7 @@
 "use client"
 
-import { Suspense, useState } from "react"
-import { signIn } from "next-auth/react"
+import { Suspense, useState, useEffect } from "react"
+import { signIn, useSession } from "next-auth/react"
 import { AuthError } from "next-auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,16 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
   const error = searchParams.get("error")
+
+  const { status } = useSession()
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      const destination = callbackUrl.startsWith("/") && callbackUrl !== "/" ? callbackUrl : "/dashboard"
+      router.replace(destination)
+    }
+  }, [status, router, callbackUrl])
+
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
